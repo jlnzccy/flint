@@ -17,3 +17,6 @@ yarn-debug.*
 yarn-error.*
 .DS_Store
 react-native-config.txt
+.claude/
+task.md
+todo.md
