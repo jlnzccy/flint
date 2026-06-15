@@ -1,56 +1,47 @@
-# Welcome to your Expo app 👋
+# Flint
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+ADHD routines app with step timers. No scrutiny, no shame, no guilt.
 
-## Get started
+Reward showing up — never measure output.
 
-1. Install dependencies
+## What it does
 
-   ```bash
-   npm install
-   ```
+- **Routines** with individual step timers — start a routine, work through each step at your own pace
+- **Tasks** (todos) with deadlines, reminders, subtasks, and repeat rules
+- **Today view** — tasks due today, scheduled routines, anytime routines, completed items
+- **Quiet attendance** — opening the app marks the day. Calendar never looks like failure; empty days are just "Rest"
+- **Streaks** — opt-in only. "Streak never dies" mode pauses on gaps instead of resetting. Streaks off = zero streak UI anywhere
+- **Skip is drama-free** — "Not today" bumps without penalty, forever
 
-2. Start the app
+## Stack
 
-   ```bash
-   npx expo start
-   ```
+- [Expo SDK 56](https://expo.dev) / React Native 0.85 / React 19
+- [expo-router](https://docs.expo.dev/router/introduction/) for navigation
+- [NativeWind 4](https://www.nativewind.dev/) + Tailwind CSS for styling
+- [Reanimated 4](https://docs.swmansion.com/react-native-reanimated/) for animations
+- [Zustand](https://zustand-demo.pmnd.rs/) + AsyncStorage for state
+- React Native Gesture Handler for drag-to-reorder
 
-In the output, you'll find options to open the app in a
+## Design
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Dark warm charcoal with chunky pressed-edge surfaces. Fonts: Nunito 800/900 for display, Be Vietnam Pro for body.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Running locally
 
 ```bash
-npm run reset-project
+# Install dependencies
+npm install
+
+# Start dev server
+npx expo start
+
+# Android dev build (notifications require a dev build, not Expo Go)
+npx expo run:android
+
+# Type check
+npx tsc --noEmit
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## License
 
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+[MIT](LICENSE)
