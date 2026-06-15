@@ -18,5 +18,8 @@ yarn-error.*
 .DS_Store
 react-native-config.txt
 .claude/
+.vscode/
+AGENTS.md
+CLAUDE.md
 task.md
 todo.md
