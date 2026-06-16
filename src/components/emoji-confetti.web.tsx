@@ -5,3 +5,6 @@ import React from 'react';
 export function EmojiConfetti(_: { count?: number }) {
   return null;
 }
+
+// web has no lottie field to warm — no-op (QoL3)
+export function warmCelebrationAssets() {}

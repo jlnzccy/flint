@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -120,10 +120,13 @@ function segToEmoji(seg: string): string {
 /* The celebration hero: a random animated emoji from the pool (turtle, stars, fire…),
    picked once per mount — never always the fire. */
 export function CelebrationEmoji({ size }: { size: number }) {
+  const reduce = useReducedMotion();
   const emoji = useMemo(
     () => segToEmoji(CELEBRATION_LOTTIE[Math.floor(Math.random() * CELEBRATION_LOTTIE.length)]),
     []
   );
+  // reduce-motion stills the hero too — a static glyph, no looping lottie (QoL6)
+  if (reduce) return <Text style={{ fontSize: size * 0.86, lineHeight: size, textAlign: 'center' }}>{emoji}</Text>;
   return <AnimatedEmoji emoji={emoji} size={size} />;
 }
 

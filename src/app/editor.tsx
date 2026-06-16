@@ -1,12 +1,13 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as IntentLauncher from 'expo-intent-launcher';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { BackHandler, InteractionManager, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
 import { ColorPickerSheet } from '@/components/color-picker';
 import { DragList } from '@/components/drag-list';
+import { warmCelebrationAssets } from '@/components/emoji-confetti';
 import { EmojiSheet } from '@/components/emoji-sheet';
 import { IconAlarm, IconArchive, IconBell, IconChevR, IconPlus, IconRestart, IconTrash, IconX } from '@/components/icons';
 import { MinutePicker } from '@/components/minute-picker';
@@ -235,6 +236,8 @@ export default function Editor() {
     const st = useStore.getState();
     const firstEver = !editing && !st.celebratedFirst;
     st.saveRoutine(r);
+    // warm the celebration lottie pool (idle) so the first party isn't sparse (QoL3)
+    InteractionManager.runAfterInteractions(() => warmCelebrationAssets());
     if (firstEver) {
       // the one-time first-routine party. Raise the full-screen overlay (rendered at the
       // app root) before navigating, so the user lands on it — never a flash of Today.

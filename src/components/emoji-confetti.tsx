@@ -32,6 +32,18 @@ async function load(seg: string): Promise<object | null> {
   return null;
 }
 
+/* Prefetch the whole float pool (+ sparkle) into the cache once, so the first
+   celebration isn't sparse while the lottie JSON loads (QoL3). Fire-and-forget; the
+   guard makes repeat calls free. Call it (idle) after the first routine is saved. */
+let warmed = false;
+export function warmCelebrationAssets() {
+  if (warmed) return;
+  warmed = true;
+  [...CELEBRATION_FLOAT, SPARKLE].forEach((seg) => {
+    if (!cache.has(seg)) load(seg);
+  });
+}
+
 function sample<T>(arr: T[], n: number): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
