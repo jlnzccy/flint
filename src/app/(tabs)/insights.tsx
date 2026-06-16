@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/chunky';
 import { IconCal, IconCheck, IconPencil } from '@/components/icons';
-import { Body, Chip, Display, Label, MiniBar, Segmented } from '@/components/ui';
+import { Body, Chip, Display, Label, MiniBar } from '@/components/ui';
 import { addDays, dateKey, DOW, DOW1, keyToDate } from '@/lib/dates';
 import { mergedHistory, resolveRoutines, streakOf, useStore } from '@/state/store';
 import { hexAlpha } from '@/theme/colors';
@@ -22,19 +22,29 @@ function StatChip({ value, label, sub }: { value: string; label: string; sub?: s
   );
 }
 
-/* GitHub-style contribution heat-grid (J1). Weekday-aligned rows of 7, oldest week
-   on top, no dates. Each box ramps faded → deep with the day's activity: a faint
-   tint for showing up / one thing, up to deep accent for a full day. Boxes are small
-   fixed squares (GitHub-style), left-aligned. Window is the J2 range. */
-function HeatGrid({ days }: { days: number }) {
+/* GitHub-style contribution heat-grid (J1/V1). Classic orientation: 7 weekday rows
+   (Mon→Sun, top→bottom), one column per week — oldest week left, this week right. No
+   dates. The grid fills the card width: we measure the card, fit as many week-columns
+   as the box+gap allow, then size each box so the columns span the full width.
+   Each box ramps faintest → brightest with the day's activity; brightness increases
+   monotonically (V3) so denser = brighter, never a dip. */
+function HeatGrid() {
   const t = useTheme();
   const history = useStore((s) => s.history);
   const doneMap = useStore((s) => s.doneMap);
   const appDays = useStore((s) => s.appDays);
   const merged = useMemo(() => mergedHistory({ history, doneMap }), [history, doneMap]);
+  const [w, setW] = useState(0);
 
-  // faded → deep ramp (index 0 = rest); richer/deeper cell = more done that day
-  const ramp = [t.raised, hexAlpha(t.accent.main, 0.24), hexAlpha(t.accent.main, 0.5), t.accent.main, t.accent.deep];
+  // faint → bright ramp (index 0 = rest); brightness strictly increases (V3): more
+  // accent blended over the dark surface, topping out at solid accent.main.
+  const ramp = [
+    t.raised,
+    hexAlpha(t.accent.main, 0.3),
+    hexAlpha(t.accent.main, 0.55),
+    hexAlpha(t.accent.main, 0.8),
+    t.accent.main,
+  ];
   const toneIdx = (k: string) => {
     const c = (merged[k] || []).length;
     if (c >= 3) return 4;
@@ -43,56 +53,46 @@ function HeatGrid({ days }: { days: number }) {
     return appDays[k] ? 1 : 0;
   };
 
-  const today = new Date();
-  const start = addDays(today, -(days - 1));
-  const lead = (start.getDay() + 6) % 7; // Monday-first column alignment
-  const cells: (string | null)[] = [
-    ...Array(lead).fill(null),
-    ...Array.from({ length: days }, (_, i) => dateKey(addDays(start, i))),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null); // fill the trailing partial week
-  const rows = cells.length / 7;
-
-  const COLS = 7;
+  const ROWS = 7; // weekdays Mon→Sun
   const GAP = 5;
-  const box = 15; // small fixed squares, GitHub-style — not stretched to the card width
-  const gridW = COLS * box + (COLS - 1) * GAP;
+  const target = 15; // aim for ~15px squares, then fit columns + size to fill exactly
+  const cols = w > 0 ? Math.max(1, Math.floor((w + GAP) / (target + GAP))) : 0;
+  const box = cols > 0 ? (w - (cols - 1) * GAP) / cols : target;
+  const radius = Math.round(box * 0.45);
+
+  const today = new Date();
+  const todayK = dateKey(today);
+  const dow = (today.getDay() + 6) % 7; // 0 = Monday
+  const curMon = addDays(today, -dow); // Monday of this week (rightmost column)
 
   return (
-    <View style={{ alignItems: 'flex-start' }}>
-      <View style={{ width: gridW, gap: GAP }}>
-        {Array.from({ length: rows }, (_, r) => (
-          <View key={r} style={{ flexDirection: 'row', gap: GAP }}>
-            {Array.from({ length: COLS }, (_, col) => {
-              const k = cells[r * COLS + col];
-              if (!k) return <View key={col} style={{ width: box, height: box }} />;
-              const idx = toneIdx(k);
-              return (
-                <View
-                  key={col}
-                  style={{
-                    width: box, height: box, borderRadius: 7,
-                    backgroundColor: ramp[idx],
-                    borderWidth: 2, borderColor: idx ? 'transparent' : t.lineSoft,
-                  }}
-                />
-              );
-            })}
-          </View>
-        ))}
-      </View>
-
-      {/* less → more ramp; empty days read as rest, never failure */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-start', marginTop: 16 }}>
-        <Body size={11.5} color={t.faint}>Rest</Body>
-        {ramp.map((c, i) => (
-          <View
-            key={i}
-            style={{ width: 13, height: 13, borderRadius: 4, backgroundColor: c, borderWidth: 2, borderColor: i ? 'transparent' : t.lineSoft }}
-          />
-        ))}
-        <Body size={11.5} color={t.faint}>More</Body>
-      </View>
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {cols > 0 && (
+        <View style={{ flexDirection: 'row', gap: GAP }}>
+          {Array.from({ length: cols }, (_, c) => {
+            const weekMon = addDays(curMon, -(cols - 1 - c) * 7);
+            return (
+              <View key={c} style={{ gap: GAP }}>
+                {Array.from({ length: ROWS }, (_, r) => {
+                  const k = dateKey(addDays(weekMon, r));
+                  if (k > todayK) return <View key={r} style={{ width: box, height: box }} />; // future
+                  const idx = toneIdx(k);
+                  return (
+                    <View
+                      key={r}
+                      style={{
+                        width: box, height: box, borderRadius: radius,
+                        backgroundColor: ramp[idx],
+                        borderWidth: 2, borderColor: idx ? 'transparent' : t.lineSoft,
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -137,7 +137,6 @@ export default function Insights() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [range, setRange] = useState<'7d' | '30d'>('30d');
 
   const history = useStore((s) => s.history);
   const doneMap = useStore((s) => s.doneMap);
@@ -192,31 +191,20 @@ export default function Insights() {
         <Display size={30}>Insights</Display>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
-        {/* the heat-grid card owns its own range toggle + calendar jump (top of card) */}
+        {/* heat-grid fills the card width (V1); no header, no range toggle (V4) */}
         <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16 }}>
-          {/* compact range toggle + calendar jump, right-aligned (not full-width) */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end', marginBottom: 14 }}>
-            <View style={{ width: 104 }}>
-              <Segmented
-                small
-                value={range}
-                onChange={setRange}
-                options={[
-                  { value: '7d', label: '7d' },
-                  { value: '30d', label: '30d' },
-                ]}
-              />
-            </View>
+          <HeatGrid />
+        </View>
+
+        {/* this-week show-up strip — own card under the heat-grid (P5); calendar jump
+            lives here now (V4), right-aligned beside the label */}
+        <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, marginTop: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <Label>This week</Label>
             <Chip onPress={() => router.push('/calendar')} style={{ paddingVertical: 7, paddingHorizontal: 10 }}>
               <IconCal size={16} color={t.muted} />
             </Chip>
           </View>
-          <HeatGrid days={range === '7d' ? 7 : 30} />
-        </View>
-
-        {/* this-week show-up strip — own card under the heat-grid (P5) */}
-        <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, marginTop: 16 }}>
-          <Label style={{ marginBottom: 14 }}>This week</Label>
           <WeekStrip />
         </View>
 
