@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
 import { FireAnim } from '@/components/fire-anim';
-import { IconCheck, IconPlus } from '@/components/icons';
+import { IconPlus } from '@/components/icons';
 import { StepPicker } from '@/components/new-routine-sheet';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Display, EmojiTile, Label } from '@/components/ui';
@@ -34,9 +34,10 @@ const PAGE = { flexGrow: 1, justifyContent: 'center' as const, paddingHorizontal
    wandered in. Animated for the lively ones, a calm static glyph where motion would nag
    (the bell). */
 function PageHero({ emoji, animated }: { emoji: string; animated?: boolean }) {
+  const reduce = useReducedMotion();
   return (
     <View style={{ height: 104, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-      {animated ? (
+      {animated && !reduce ? (
         <AnimatedEmoji emoji={emoji} size={84} />
       ) : (
         <Text style={{ fontSize: 72, textAlign: 'center' }}>{emoji}</Text>
@@ -100,15 +101,21 @@ export default function Onboarding() {
     ref.current?.scrollTo({ x: width * (page + 1), animated: true });
   };
 
-  const enableNotifs = async () => {
-    const ok = await ensurePermission();
-    if (ok) {
-      setSettings({ remindersOn: true });
-      setNotifOn(true);
-      toast('Notifications on');
-    } else {
-      toast('Allow it in system settings');
+  // reminders page index: welcome + intro slides, then the bell page
+  const remindersPage = 1 + SLIDES.length;
+
+  // Next doubles as the notifications opt-in on the reminders page (S3): it requests
+  // permission once, then always advances — declining never traps the user (P16).
+  const handleNext = async () => {
+    if (page === remindersPage && !notifOn) {
+      const ok = await ensurePermission();
+      if (ok) {
+        setSettings({ remindersOn: true });
+        setNotifOn(true);
+        toast('Notifications on');
+      }
     }
+    next();
   };
 
   return (
@@ -166,28 +173,15 @@ export default function Onboarding() {
         {/* reminders */}
         <View style={{ width }}>
           <ScrollView contentContainerStyle={PAGE} showsVerticalScrollIndicator={false}>
-            <PageHero emoji="🔔" />
+            <PageHero emoji="🔔" animated />
             <Display size={26} style={{ textAlign: 'center' }}>Gentle nudges?</Display>
-            <Body size={14.5} color={t.muted} style={{ textAlign: 'center', marginTop: 10, marginBottom: 28, lineHeight: 21 }}>
+            <Body size={14.5} color={t.muted} style={{ textAlign: 'center', marginTop: 10, marginBottom: 16, lineHeight: 21 }}>
               A nudge when a routine is due — alarms too, if you set one. Always optional.
             </Body>
-
-            <ChunkyButton
-              ghost={!notifOn}
-              color={notifOn ? t.green.main : undefined}
-              deep={notifOn ? t.green.deep : undefined}
-              ink={notifOn ? t.green.ink : undefined}
-              fontSize={16}
-              pad={[16, 20]}
-              onPress={enableNotifs}
-            >
-              {notifOn ? <IconCheck size={16} color={t.green.ink} /> : null}
-              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 16, color: notifOn ? t.green.ink : t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                {notifOn ? 'Notifications on' : 'Enable notifications'}
-              </Text>
-            </ChunkyButton>
-            <Body size={12.5} color={t.faint} style={{ marginTop: 12, textAlign: 'center' }}>
-              You can flip this any time in Settings.
+            {/* the bottom Next button asks for permission on this page (S3); no standalone
+                button. We just say what tapping Next does, plus the always-optional caption. */}
+            <Body size={12.5} color={t.faint} style={{ textAlign: 'center' }}>
+              {notifOn ? 'Notifications are on. ' : 'Next will ask your permission. '}You can flip this any time in Settings.
             </Body>
           </ScrollView>
         </View>
@@ -231,7 +225,7 @@ export default function Onboarding() {
       {/* next (dots live in the top header now) */}
       <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 20, paddingTop: 12 }}>
         {page < PAGES - 1 && (
-          <ChunkyButton fontSize={17} pad={[17, 24]} onPress={next}>
+          <ChunkyButton fontSize={17} pad={[17, 24]} onPress={handleNext}>
             Next
           </ChunkyButton>
         )}

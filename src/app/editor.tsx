@@ -132,11 +132,16 @@ export default function Editor() {
   if (baseline.current === null) baseline.current = snapshot();
   const dirty = baseline.current !== snapshot();
 
+  // when the editor is opened from onboarding it's a router.replace → there's no back
+  // stack, so router.back() is a no-op (the X / discard / post-save back all looked dead).
+  // safeBack falls back to Today when there's nothing to pop (S1).
+  const safeBack = () => (router.canGoBack() ? router.back() : router.replace('/(tabs)'));
+
   // Close button + Android hardware back route through here; intentional exits
   // (save/archive/delete) call the router directly and skip the guard.
   const leave = () => {
-    if (dirty) confirmDestructive('Discard changes?', "Your edits won't be saved.", 'Discard', () => router.back());
-    else router.back();
+    if (dirty) confirmDestructive('Discard changes?', "Your edits won't be saved.", 'Discard', () => safeBack());
+    else safeBack();
   };
   useFocusEffect(
     useCallback(() => {
@@ -195,11 +200,10 @@ export default function Editor() {
       // app root) before navigating, so the user lands on it — never a flash of Today.
       st.markFirstCelebrated();
       st.setShowCelebration(true);
-      if (router.canGoBack()) router.back();
-      else router.replace('/(tabs)');
+      safeBack();
     } else {
       toast('Saved');
-      router.back();
+      safeBack();
     }
   };
 
