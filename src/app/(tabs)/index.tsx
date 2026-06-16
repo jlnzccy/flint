@@ -6,7 +6,7 @@ import Animated, { Easing, Keyframe, runOnJS, useAnimatedStyle, useSharedValue, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
-import { IconArchive, IconCal, IconClock, IconDots, IconDrag, IconPlus } from '@/components/icons';
+import { IconArchive, IconCal, IconDots, IconDrag, IconPlus } from '@/components/icons';
 import { NewRoutineSheet } from '@/components/new-routine-sheet';
 import { PreviewSheet, RoutineCard } from '@/components/routine-bits';
 import { BottomSheet } from '@/components/sheet';
@@ -250,9 +250,6 @@ export default function TodayScreen() {
                 <Chip active onPress={() => setReordering(false)}>Done</Chip>
               ) : (
                 <>
-                  <Chip onPress={() => router.push('/timer')} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
-                    <IconClock size={16} color={t.muted} />
-                  </Chip>
                   {(routines.length > 1 || archivedList.length > 0) && (
                     <Chip onPress={() => setMenuOpen(true)} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
                       <IconDots size={16} color={t.muted} />
