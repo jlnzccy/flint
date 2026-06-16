@@ -225,7 +225,7 @@ export const useStore = create<FlintState>()(
             return {
               overrides: {
                 ...s.overrides,
-                [r.id]: { name: r.name, emoji: r.emoji, color: r.color, steps: r.steps, reminder: r.reminder, alarm: r.alarm, days: r.days, autoAdvance: r.autoAdvance, warn30: r.warn30, alarmRingtoneUri: r.alarmRingtoneUri },
+                [r.id]: { name: r.name, emoji: r.emoji, color: r.color, steps: r.steps, reminder: r.reminder, alarm: r.alarm, days: r.days, autoAdvance: r.autoAdvance, warn30: r.warn30, alarmRingtoneUri: r.alarmRingtoneUri, pomodoro: r.pomodoro },
               },
             };
           }

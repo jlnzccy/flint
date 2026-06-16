@@ -6,6 +6,14 @@ export interface Step {
   hint?: string;
 }
 
+/* A Pomodoro routine's config (W). Its steps are *derived* from this — N focus blocks
+   with a break between each (N focus → N-1 breaks) — never hand-edited. */
+export interface RoutinePomodoro {
+  focusMin: number;
+  breakMin: number;
+  sessions: number; // number of focus blocks
+}
+
 export interface Routine {
   id: string;
   name: string;
@@ -18,8 +26,22 @@ export interface Routine {
   autoAdvance?: boolean; // at a step's 0, move to the next step automatically (player E4)
   warn30?: boolean; // cue when 30s remain on a step (player E5)
   alarmRingtoneUri?: string | null; // per-routine alarm sound; null/absent = bundled marimba
+  pomodoro?: RoutinePomodoro; // present = a Pomodoro routine; steps are generated from this (W)
   builtin?: boolean;
 }
+
+export const DEFAULT_POMODORO_CFG: RoutinePomodoro = { focusMin: 25, breakMin: 5, sessions: 4 };
+
+/* Generate the focus/break step list from a Pomodoro config: breaks sit *between*
+   focus blocks only, so N focus blocks produce N-1 breaks (W). */
+export const buildPomodoroSteps = (cfg: RoutinePomodoro): Step[] => {
+  const steps: Step[] = [];
+  for (let i = 0; i < cfg.sessions; i++) {
+    steps.push({ t: 'Focus', min: cfg.focusMin, hint: i === 0 ? 'One thing. Start small.' : undefined });
+    if (i < cfg.sessions - 1) steps.push({ t: 'Break', min: cfg.breakMin, hint: 'Stretch, water, look away.' });
+  }
+  return steps;
+};
 
 /* does this routine show up today? */
 export const routineOnDay = (r: Pick<Routine, 'days'>, dow = new Date().getDay()): boolean =>
@@ -82,10 +104,12 @@ export interface RoutineTemplate {
   id: string;
   emoji: string;
   name: string;
-  color: ColorName;
+  color: ColorName | string; // preset name or custom "#rrggbb" (Pomodoro uses tomato)
   reminder?: string;
   alarm?: boolean;
   steps: Step[];
+  autoAdvance?: boolean;
+  pomodoro?: RoutinePomodoro; // present = skip the step-picker, edit via sliders (W)
 }
 
 export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
@@ -155,6 +179,13 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
       { t: 'Dry off', min: 3 },
       { t: 'Moisturize', min: 3 },
     ],
+  },
+  {
+    // Pomodoro is a routine now: skips the step-picker, edits via sliders, breaks flow
+    // without a tap (autoAdvance). Tomato red, steps generated from the default config.
+    id: 't-pomodoro', emoji: '🍅', name: 'Pomodoro', color: '#e8503a', autoAdvance: true,
+    pomodoro: DEFAULT_POMODORO_CFG,
+    steps: buildPomodoroSteps(DEFAULT_POMODORO_CFG),
   },
 ];
 

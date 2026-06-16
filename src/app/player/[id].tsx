@@ -454,8 +454,9 @@ export default function Player() {
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <ChunkyButton ghost fontSize={13} pad={[10, 16]} onPress={() => setExtra((x) => x + 60)}>
-              +1 min
+            {/* pomodoro routines extend by 5 min (a flow nudge), everything else by 1 (W4) */}
+            <ChunkyButton ghost fontSize={13} pad={[10, 16]} onPress={() => setExtra((x) => x + (routine.pomodoro ? 300 : 60))}>
+              {routine.pomodoro ? '+5 min' : '+1 min'}
             </ChunkyButton>
             <ChunkyButton
               ghost

@@ -200,7 +200,8 @@ export default function Onboarding() {
                 return (
                   <ChunkyCard
                     key={tpl.id}
-                    onPress={() => setPickTpl(tpl)}
+                    // Pomodoro skips the step-picker — straight into the editor (W2)
+                    onPress={() => (tpl.pomodoro ? finish(`/editor?template=${tpl.id}`) : setPickTpl(tpl))}
                     style={{ width: '47%' }}
                     faceStyle={{ padding: 14 }}
                   >

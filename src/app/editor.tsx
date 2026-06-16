@@ -11,10 +11,11 @@ import { EmojiSheet } from '@/components/emoji-sheet';
 import { IconAlarm, IconArchive, IconBell, IconChevR, IconPlus, IconRestart, IconTrash, IconX } from '@/components/icons';
 import { MinutePicker } from '@/components/minute-picker';
 import { BottomSheet } from '@/components/sheet';
+import { Slider } from '@/components/slider';
 import { TimePicker } from '@/components/time-picker';
 import { useToast } from '@/components/toast';
 import { Body, Chip, Display, FlintInput, Label, Segmented, Toggle, useTimeFmt } from '@/components/ui';
-import { COLOR_CHOICES, EMOJI_CHOICES, getTemplate, Routine } from '@/data/defaults';
+import { buildPomodoroSteps, COLOR_CHOICES, EMOJI_CHOICES, getTemplate, routineMin, Routine, RoutinePomodoro } from '@/data/defaults';
 import { confirmDestructive } from '@/lib/confirm';
 import { tapHaptic } from '@/lib/haptics';
 import { resolveRoutines, useStore } from '@/state/store';
@@ -28,6 +29,25 @@ interface DraftStep {
   min: number;
   hint: string;
   _k: string;
+}
+
+/* Pomodoro config row: label + live value + a swipe slider (W3). */
+function PomoSliderRow({
+  label, sub, value, unit, min, max, step, color, onChange,
+}: { label: string; sub?: string; value: number; unit?: string; min: number; max: number; step: number; color: string; onChange: (v: number) => void }) {
+  const t = useTheme();
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Body size={15} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
+          {sub ? <Body size={12} color={t.faint} style={{ marginTop: 1 }}>{sub}</Body> : null}
+        </View>
+        <Display size={16}>{unit ? `${value} ${unit}` : value}</Display>
+      </View>
+      <Slider value={value} min={min} max={max} step={step} color={color} onChange={onChange} />
+    </View>
+  );
 }
 
 export default function Editor() {
@@ -83,6 +103,19 @@ export default function Editor() {
   const [draftTime, setDraftTime] = useState(reminder || '07:00');
   const kRef = useRef(steps.length);
 
+  // Pomodoro routine? steps are derived from this config (W3). Seeds from the edited
+  // routine or the Pomodoro template; null = an ordinary step-list routine.
+  const pomoSeed = routine?.pomodoro ?? tpl?.pomodoro ?? null;
+  const isPomo = !!pomoSeed;
+  const [pomo, setPomo] = useState<RoutinePomodoro | null>(pomoSeed);
+  // a slider change rebuilds the focus/break steps in place
+  const setPomoField = (patch: Partial<RoutinePomodoro>) => {
+    if (!pomo) return;
+    const next = { ...pomo, ...patch };
+    setPomo(next);
+    setSteps(buildPomodoroSteps(next).map((s, i) => ({ t: s.t, min: s.min, hint: s.hint ?? '', _k: 'k' + i })));
+  };
+
   const customColor = !COLOR_CHOICES.includes(color as any);
   const customEmoji = !EMOJI_CHOICES.slice(0, 6).includes(emoji);
   const toggleDay = (d: number) =>
@@ -127,6 +160,7 @@ export default function Editor() {
       alarmUri,
       days: [...days].sort(),
       steps: steps.map((s) => ({ t: s.t.trim(), min: s.min, hint: s.hint.trim() })),
+      pomo,
     });
   const baseline = useRef<string | null>(null);
   if (baseline.current === null) baseline.current = snapshot();
@@ -191,6 +225,10 @@ export default function Editor() {
       days: days.length === 7 ? undefined : [...days].sort(),
       steps: steps.filter((s) => s.t.trim()).map((s) => ({ t: s.t.trim(), min: s.min, hint: s.hint.trim() || undefined })),
       alarmRingtoneUri: reminder && alarm ? alarmUri : null,
+      // pomodoro routines auto-advance through breaks; carry the config + flag (W1)
+      pomodoro: isPomo && pomo ? pomo : undefined,
+      autoAdvance: isPomo ? true : routine?.autoAdvance,
+      warn30: routine?.warn30,
     };
     const st = useStore.getState();
     const firstEver = !editing && !st.celebratedFirst;
@@ -417,6 +455,21 @@ export default function Editor() {
             );
           })}
         </View>
+        {isPomo && pomo ? (
+          /* Pomodoro: sliders regenerate the focus/break steps; no manual list (W3) */
+          <>
+            <Label style={{ marginTop: 22, marginBottom: 8 }}>Pomodoro</Label>
+            <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, gap: 18 }}>
+              <PomoSliderRow label="Sessions" sub="focus blocks" value={pomo.sessions} min={2} max={8} step={1} color={c.main} onChange={(v) => setPomoField({ sessions: v })} />
+              <PomoSliderRow label="Focus" value={pomo.focusMin} unit="min" min={5} max={60} step={5} color={c.main} onChange={(v) => setPomoField({ focusMin: v })} />
+              <PomoSliderRow label="Break" sub="between sessions" value={pomo.breakMin} unit="min" min={1} max={20} step={1} color={c.main} onChange={(v) => setPomoField({ breakMin: v })} />
+            </View>
+            <Body size={12} color={t.faint} style={{ marginTop: 10, textAlign: 'center' }}>
+              {pomo.sessions} focus · {pomo.sessions - 1} break{pomo.sessions === 2 ? '' : 's'} · {routineMin({ steps })} min total
+            </Body>
+          </>
+        ) : (
+          <>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 8 }}>
           <Label>Steps</Label>
           <Body size={12} color={t.faint}>Tap to set time</Body>
@@ -465,6 +518,8 @@ export default function Editor() {
             Add step
           </Text>
         </ChunkyButton>
+          </>
+        )}
 
         {editing && (
           <View style={{ marginTop: 22, gap: 10 }}>

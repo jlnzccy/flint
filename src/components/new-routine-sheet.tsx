@@ -56,7 +56,8 @@ export function NewRoutineSheet({ open, onClose }: { open: boolean; onClose: () 
               return (
                 <ChunkyCard
                   key={tpl.id}
-                  onPress={() => setPicked(tpl)}
+                  // Pomodoro skips the step-picker — steps are generated, edited via sliders (W2)
+                  onPress={() => (tpl.pomodoro ? go(`/editor?template=${tpl.id}`) : setPicked(tpl))}
                   faceStyle={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12 }}
                 >
                   <EmojiTile emoji={tpl.emoji} size={44} radius={13} soft={c.soft} border={c.main} />
