@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { ChunkyButton } from '@/components/chunky';
+import { EmojiConfetti } from '@/components/emoji-confetti';
 import { Body, Display } from '@/components/ui';
 import { CELEBRATION_LOTTIE } from '@/data/celebration-emojis';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -19,10 +20,10 @@ import { useTheme } from '@/theme/theme';
 
 type Piece = {
   ox: number; // launch origin x (px from left)
-  oy: number; // launch origin y (px from top — near the bottom edge)
+  oy: number; // launch origin y (px from top — near the top edge)
   vx: number; // total horizontal travel over the shot (signed; outward from the corner)
-  vyUp: number; // initial upward impulse (px)
-  g: number; // gravity pull (px) — arcs the piece back down past the bottom
+  vy: number; // initial downward impulse (px)
+  g: number; // gravity pull (px) — accelerates the piece down past the bottom edge
   w: number;
   h: number;
   color: string;
@@ -39,9 +40,9 @@ function ConfettiPiece({ piece }: { piece: Piece }) {
   }, []);
 
   const st = useAnimatedStyle(() => {
-    // ballistic arc: straight horizontal spread, vertical = up impulse then gravity
+    // rains down from the top: horizontal spread outward, vertical = down impulse + gravity
     const tx = piece.ox + piece.vx * p.value;
-    const ty = piece.oy - piece.vyUp * p.value + piece.g * p.value * p.value;
+    const ty = piece.oy + piece.vy * p.value + piece.g * p.value * p.value;
     const opacity = p.value < 0.82 ? 1 : Math.max(0, 1 - (p.value - 0.82) / 0.18);
     return {
       opacity,
@@ -63,11 +64,11 @@ function ConfettiPiece({ piece }: { piece: Piece }) {
   );
 }
 
-/* One-shot confetti *cannon*: pieces launch from the two lower corners with an angle
-   + speed, arc outward sideways, then fall under gravity past the bottom edge, then
-   release (no loop). Tinted from the palette plus the passed routine color. Honors
-   reduce-motion — renders nothing when calmed. */
-export function Confetti({ color, count = 70 }: { color?: string; count?: number }) {
+/* One-shot confetti *rain* (U1): pieces launch from the two upper corners, spray down
+   + outward, then accelerate down under gravity past the bottom edge, then release (no
+   loop). Denser than the old cannon. Tinted from the palette plus the passed routine
+   color. Honors reduce-motion — renders nothing when calmed. */
+export function Confetti({ color, count = 110 }: { color?: string; count?: number }) {
   const t = useTheme();
   const reduce = useReducedMotion();
   const { width, height } = useWindowDimensions();
@@ -80,19 +81,19 @@ export function Confetti({ color, count = 70 }: { color?: string; count?: number
     return Array.from({ length: count }, (_, i) => {
       const left = i % 2 === 0; // alternate corners → balanced left/right spray
       const dir = left ? 1 : -1; // left corner sprays right, right corner sprays left
-      const ox = left ? rand(0, width * 0.1) : width - rand(0, width * 0.1);
-      const oy = height - rand(20, 80); // just above the bottom edge
-      const speed = rand(0.42, 0.95) * width; // horizontal reach across the screen
+      const ox = left ? rand(0, width * 0.12) : width - rand(0, width * 0.12);
+      const oy = rand(8, 70); // just below the top edge
+      const speed = rand(0.28, 0.8) * width; // horizontal reach outward across the screen
       return {
         ox,
         oy,
         vx: dir * speed,
-        vyUp: rand(1.25, 1.85) * height, // strong up impulse → real arc
-        g: rand(1.75, 2.4) * height, // pulls it back down off the bottom by p=1
+        vy: rand(0.2, 0.5) * height, // initial downward kick
+        g: rand(1.2, 1.7) * height, // gravity carries it down past the bottom by p=1
         w: rand(6, 11),
         h: rand(9, 16),
         color: palette[Math.floor(Math.random() * palette.length)],
-        delay: rand(0, 240), // tight burst, not a drawn-out rain
+        delay: rand(0, 260), // tight burst, not a drawn-out drip
         dur: rand(1300, 2000),
         spin: rand(180, 720) * (Math.random() < 0.5 ? -1 : 1),
       };
@@ -140,6 +141,7 @@ export function CelebrationOverlay({
       style={[StyleSheet.absoluteFill, { backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, zIndex: 50 }]}
     >
       <Confetti color={t.accent.main} />
+      <EmojiConfetti />
       <View style={{ width: 210, height: 210, alignItems: 'center', justifyContent: 'center' }}>
         <Animated.View entering={popIn()}>
           <CelebrationEmoji size={150} />

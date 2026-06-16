@@ -3,14 +3,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
 
-import { CELEBRATION_LOTTIE } from '@/data/celebration-emojis';
+import { CELEBRATION_FLOAT } from '@/data/celebration-emojis';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 
-/* Random animated-emoji confetti for the celebration — Noto lottie emojis that pop
-   outward from the fire, fade, and re-pop on a loop. Sits alongside the fire (never
-   replaces it). Lottie is native-only; web gets the no-op variant. */
+/* A soft floating field of small animated-emoji (U2): Noto lottie emojis scattered
+   *around* the celebration hero — varied size, varied lottie speed, each bobbing
+   gently up and down out of phase with the others. Not a pop-outward burst; a calm,
+   lively backdrop. Sits alongside the hero (never replaces it). Lottie is native-only;
+   web gets the no-op variant. Gated on reduce-motion. */
 
 const CDN = 'https://fonts.gstatic.com/s/e/notoemoji/latest';
 const cache = new Map<string, object | null>();
+const SPARKLE = '2728'; // ✨ sprinkled among the pool picks
 
 async function load(seg: string): Promise<object | null> {
   if (cache.has(seg)) return cache.get(seg)!;
@@ -37,38 +41,51 @@ function sample<T>(arr: T[], n: number): T[] {
   return a.slice(0, Math.min(n, a.length));
 }
 
-export function EmojiConfetti({ count = 11 }: { count?: number }) {
+export function EmojiConfetti({ count = 12 }: { count?: number }) {
+  const reduce = useReducedMotion();
   const { width, height } = useWindowDimensions();
-  const picks = useMemo(() => sample(CELEBRATION_LOTTIE, count), [count]);
+  // pick from the float pool, then sprinkle in ✨ (~1 in 4) — fixed once per mount
+  const picks = useMemo(
+    () => sample(CELEBRATION_FLOAT, count).map((seg) => (Math.random() < 0.28 ? SPARKLE : seg)),
+    [count]
+  );
   const cx = width / 2;
-  const cy = height * 0.42; // roughly behind the fire
+  const cy = height * 0.4; // around the hero, which sits a touch above centre
+  if (reduce) return null;
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
       {picks.map((seg, i) => (
-        <Pop key={`${seg}-${i}`} seg={seg} index={i} total={picks.length} cx={cx} cy={cy} />
+        <Float key={`${seg}-${i}`} seg={seg} index={i} total={picks.length} cx={cx} cy={cy} />
       ))}
     </View>
   );
 }
 
-function Pop({ seg, index, total, cx, cy }: { seg: string; index: number; total: number; cx: number; cy: number }) {
+function Float({ seg, index, total, cx, cy }: { seg: string; index: number; total: number; cx: number; cy: number }) {
   const [data, setData] = useState<object | null>(() => cache.get(seg) ?? null);
 
-  // randoms fixed once per particle (never inside the worklet, which re-runs each frame)
+  // randoms fixed once per particle (never inside the worklet, which re-runs each frame).
+  // scatter on a ring around the hero so nothing stacks on the centre glyph; each gets
+  // its own size, lottie speed, bob amplitude/period and phase.
   const p = useMemo(() => {
-    const size = 42 + Math.random() * 28;
+    const size = 28 + Math.random() * 36; // 28–64px
+    const angle = (index / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
+    const radius = 110 + Math.random() * 140; // outside the ~150px hero
     return {
       size,
-      angle: (index / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.5,
-      dist: 95 + Math.random() * 170,
-      delay: Math.random() * 600,
-      dur: 1400 + Math.random() * 800,
-      spin: (Math.random() < 0.5 ? -1 : 1) * (16 + Math.random() * 30),
+      x: cx + Math.cos(angle) * radius - size / 2,
+      y: cy + Math.sin(angle) * radius - size / 2,
+      amp: 6 + Math.random() * 6, // bob ±6–12px
+      bobDur: 1600 + Math.random() * 1000,
+      phase: Math.random() * 1200, // out of phase with its neighbours
+      speed: 0.6 + Math.random() * 0.8, // lottie playback 0.6–1.4
+      fadeDelay: Math.random() * 500,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, total]);
+  }, [index, total, cx, cy]);
 
-  const prog = useSharedValue(0);
+  const bob = useSharedValue(0);
+  const appear = useSharedValue(0);
 
   useEffect(() => {
     let alive = true;
@@ -80,27 +97,25 @@ function Pop({ seg, index, total, cx, cy }: { seg: string; index: number; total:
   }, [seg]);
 
   useEffect(() => {
-    prog.value = withRepeat(
-      withDelay(p.delay, withTiming(1, { duration: p.dur, easing: Easing.out(Easing.cubic) })),
-      -1,
-      false
+    appear.value = withDelay(p.fadeDelay, withTiming(1, { duration: 420 }));
+    bob.value = withDelay(
+      p.phase,
+      withRepeat(withTiming(1, { duration: p.bobDur, easing: Easing.inOut(Easing.ease) }), -1, true)
     );
-  }, [prog, p]);
+  }, [bob, appear, p]);
 
   const style = useAnimatedStyle(() => ({
+    opacity: appear.value,
     transform: [
-      { translateX: Math.sin(p.angle) * p.dist * prog.value },
-      { translateY: -Math.cos(p.angle) * p.dist * prog.value },
-      { scale: 0.3 + prog.value * 0.95 },
-      { rotate: `${p.spin * prog.value}deg` },
+      { translateY: (bob.value - 0.5) * 2 * p.amp },
+      { scale: 0.7 + appear.value * 0.3 },
     ],
-    opacity: prog.value < 0.15 ? prog.value / 0.15 : 1 - (prog.value - 0.15) / 0.85,
   }));
 
   if (!data) return null;
   return (
-    <Animated.View style={[{ position: 'absolute', left: cx - p.size / 2, top: cy - p.size / 2, width: p.size, height: p.size }, style]}>
-      <LottieView source={data as never} autoPlay loop style={{ width: p.size, height: p.size }} />
+    <Animated.View style={[{ position: 'absolute', left: p.x, top: p.y, width: p.size, height: p.size }, style]}>
+      <LottieView source={data as never} autoPlay loop speed={p.speed} style={{ width: p.size, height: p.size }} />
     </Animated.View>
   );
 }

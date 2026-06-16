@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { CelebrationEmoji, Confetti } from '@/components/celebration';
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
+import { EmojiConfetti } from '@/components/emoji-confetti';
 import {
   IconCheck, IconChevL, IconClock, IconPause, IconPencil, IconPlay, IconRestart, IconSkip, IconX,
 } from '@/components/icons';
@@ -275,6 +276,7 @@ export default function Player() {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
         <Confetti color={c.main} />
+        <EmojiConfetti />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 20 }}
