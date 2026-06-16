@@ -65,6 +65,9 @@ function HeatGrid() {
   const dow = (today.getDay() + 6) % 7; // 0 = Monday
   const curMon = addDays(today, -dow); // Monday of this week (rightmost column)
 
+  // a brand-new grid is nearly empty — a quiet caption keeps it from looking broken (QoL4)
+  const anyDone = Object.values(merged).some((v) => v.length > 0);
+
   return (
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       {cols > 0 && (
@@ -92,6 +95,11 @@ function HeatGrid() {
             );
           })}
         </View>
+      )}
+      {!anyDone && (
+        <Body size={12.5} color={t.faint} style={{ textAlign: 'center', marginTop: 12 }}>
+          Fills in as you show up.
+        </Body>
       )}
     </View>
   );
