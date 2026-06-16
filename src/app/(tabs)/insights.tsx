@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/chunky';
-import { IconCal, IconPencil } from '@/components/icons';
+import { IconCal, IconCheck, IconPencil } from '@/components/icons';
 import { Body, Chip, Display, Label, MiniBar, Segmented } from '@/components/ui';
-import { addDays, dateKey, DOW, keyToDate } from '@/lib/dates';
+import { addDays, dateKey, DOW, DOW1, keyToDate } from '@/lib/dates';
 import { mergedHistory, resolveRoutines, streakOf, useStore } from '@/state/store';
 import { hexAlpha } from '@/theme/colors';
 import { useTheme } from '@/theme/theme';
@@ -14,21 +14,20 @@ import { useTheme } from '@/theme/theme';
 function StatChip({ value, label, sub }: { value: string; label: string; sub?: string }) {
   const t = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 14 }}>
-      <Display size={22} style={{ color: t.accent.main }}>{value}</Display>
-      <Body size={12.5} style={{ marginTop: 3, fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
-      {sub ? <Body size={11.5} color={t.faint} style={{ marginTop: 2 }}>{sub}</Body> : null}
+    <View style={{ flex: 1, backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 12 }}>
+      <Display size={20} style={{ color: t.accent.main }}>{value}</Display>
+      <Body size={12} style={{ marginTop: 3, fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
+      {sub ? <Body size={11} color={t.faint} style={{ marginTop: 1 }}>{sub}</Body> : null}
     </View>
   );
 }
 
 /* GitHub-style contribution heat-grid (J1). Weekday-aligned rows of 7, oldest week
    on top, no dates. Each box ramps faded → deep with the day's activity: a faint
-   tint for showing up / one thing, up to deep accent for a full day. Boxes fill the
-   card width. Window is the J2 range. */
+   tint for showing up / one thing, up to deep accent for a full day. Boxes are small
+   fixed squares (GitHub-style), left-aligned. Window is the J2 range. */
 function HeatGrid({ days }: { days: number }) {
   const t = useTheme();
-  const { width } = useWindowDimensions();
   const history = useStore((s) => s.history);
   const doneMap = useStore((s) => s.doneMap);
   const appDays = useStore((s) => s.appDays);
@@ -55,13 +54,12 @@ function HeatGrid({ days }: { days: number }) {
   const rows = cells.length / 7;
 
   const COLS = 7;
-  const GAP = 6;
-  // fill the card's inner width: screen − 20·2 page margin − 16·2 card padding
-  const box = Math.floor((width - 40 - 32 - GAP * (COLS - 1)) / COLS);
+  const GAP = 5;
+  const box = 15; // small fixed squares, GitHub-style — not stretched to the card width
   const gridW = COLS * box + (COLS - 1) * GAP;
 
   return (
-    <View style={{ alignItems: 'center' }}>
+    <View style={{ alignItems: 'flex-start' }}>
       <View style={{ width: gridW, gap: GAP }}>
         {Array.from({ length: rows }, (_, r) => (
           <View key={r} style={{ flexDirection: 'row', gap: GAP }}>
@@ -85,7 +83,7 @@ function HeatGrid({ days }: { days: number }) {
       </View>
 
       {/* less → more ramp; empty days read as rest, never failure */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginTop: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-start', marginTop: 16 }}>
         <Body size={11.5} color={t.faint}>Rest</Body>
         {ramp.map((c, i) => (
           <View
@@ -95,6 +93,42 @@ function HeatGrid({ days }: { days: number }) {
         ))}
         <Body size={11.5} color={t.faint}>More</Body>
       </View>
+    </View>
+  );
+}
+
+/* Last-7-days show-up strip (P5). Trailing 7 days oldest→today, one marker per day.
+   A check when ≥1 routine was finished that day; off days are a plain neutral dot —
+   never an ✗ (quiet attendance, no shame). Today's weekday label is brought forward. */
+function WeekStrip() {
+  const t = useTheme();
+  const history = useStore((s) => s.history);
+  const doneMap = useStore((s) => s.doneMap);
+  const merged = useMemo(() => mergedHistory({ history, doneMap }), [history, doneMap]);
+  const today = new Date();
+  const todayK = dateKey(today);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -6 + i));
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      {days.map((d) => {
+        const k = dateKey(d);
+        const done = (merged[k] || []).length > 0;
+        const isToday = k === todayK;
+        return (
+          <View key={k} style={{ alignItems: 'center', gap: 8 }}>
+            <Body size={11.5} color={isToday ? t.muted : t.faint}>{DOW1[d.getDay()]}</Body>
+            <View
+              style={{
+                width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: done ? t.accent.soft : t.raised,
+                borderWidth: 2, borderColor: done ? t.accent.main : t.lineSoft,
+              }}
+            >
+              {done ? <IconCheck size={16} color={t.accent.main} /> : null}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -160,8 +194,9 @@ export default function Insights() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
         {/* the heat-grid card owns its own range toggle + calendar jump (top of card) */}
         <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <View style={{ flex: 1 }}>
+          {/* compact range toggle + calendar jump, right-aligned (not full-width) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end', marginBottom: 14 }}>
+            <View style={{ width: 104 }}>
               <Segmented
                 small
                 value={range}
@@ -177,6 +212,12 @@ export default function Insights() {
             </Chip>
           </View>
           <HeatGrid days={range === '7d' ? 7 : 30} />
+        </View>
+
+        {/* this-week show-up strip — own card under the heat-grid (P5) */}
+        <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, marginTop: 16 }}>
+          <Label style={{ marginBottom: 14 }}>This week</Label>
+          <WeekStrip />
         </View>
 
         <Label style={{ marginTop: 24, marginBottom: 10 }}>Patterns</Label>
