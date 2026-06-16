@@ -37,9 +37,12 @@ export const TIMING = {
 /* Gesture dismiss thresholds (sheet + toast). */
 export const DISMISS = { distance: 110, velocity: 800 } as const;
 
-/* Native screen transition duration (see src/app/_layout.tsx). Longer than the
-   stock ~300ms so the iOS parallax push reads as a smooth glide, not a quick snap. */
-export const SCREEN_DURATION = 380;
+/* Native screen transition duration (see src/app/_layout.tsx). Set to the Material
+   spec's full-screen / complex-transition duration (~375ms; 300ms is the small-element
+   standard, >400ms reads as slow) so the iOS parallax push glides rather than snaps.
+   Duration is already in-band — if Android still feels rough, the lever is the easing
+   curve + mount jank, not a longer time. (Material Design motion-duration guidance.) */
+export const SCREEN_DURATION = 375;
 
 /* ── Entering presets (layout animations) ──
    Factories so each mount gets a fresh builder. Drive screen-content
