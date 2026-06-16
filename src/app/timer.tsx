@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
-import { IconGear, IconPause, IconPlay, IconRestart, IconSkip, IconX } from '@/components/icons';
+import { IconCheck, IconGear, IconRestart, IconSkip, IconX } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { TimerRing } from '@/components/timer-ring';
 import { Body, Display, Segmented, StepperBtn, Toggle } from '@/components/ui';
@@ -26,13 +26,19 @@ function FreeTimer() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [elapsed, setElapsed] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // starts idle at 0:00 — an explicit Start press begins counting (P10)
+  const [running, setRunning] = useState(false);
 
   useEffect(() => {
-    if (paused) return;
+    if (!running) return;
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(id);
-  }, [paused]);
+  }, [running]);
+
+  const restart = () => {
+    setElapsed(0);
+    setRunning(false);
+  };
 
   return (
     <>
@@ -44,22 +50,21 @@ function FreeTimer() {
           </Body>
         </View>
 
-        <TimerRing progress={(elapsed % 60) / 60} color={t.accent.main} size={208} pulsing={!paused}>
+        <TimerRing progress={(elapsed % 60) / 60} color={t.accent.main} size={208} pulsing={running}>
           <Display size={46}>{fmtSec(elapsed)}</Display>
         </TimerRing>
-
-        <ChunkyButton ghost fontSize={13} pad={[10, 16]} onPress={() => { setElapsed(0); setPaused(false); }}>
-          <IconRestart color={t.text} />
-        </ChunkyButton>
       </View>
 
-      <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: insets.bottom + 18, flexDirection: 'row', gap: 14 }}>
-        <CircleBtn onPress={() => setPaused((p) => !p)} label={paused ? 'Resume' : 'Pause'}>
-          {paused ? <IconPlay color={t.text} /> : <IconPause color={t.text} />}
+      <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: insets.bottom + 18, flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+        <CircleBtn onPress={restart} label="Restart">
+          <IconRestart color={t.text} />
         </CircleBtn>
-        <ChunkyButton color={t.accent.main} deep={t.accent.deep} ink={t.accent.ink} fontSize={18} pad={[17, 24]} style={{ flex: 1 }} onPress={() => router.back()}>
-          Done
+        <ChunkyButton color={t.accent.main} deep={t.accent.deep} ink={t.accent.ink} fontSize={18} pad={[17, 24]} style={{ flex: 1 }} onPress={() => setRunning((r) => !r)}>
+          {running ? 'Pause' : elapsed > 0 ? 'Resume' : 'Start'}
         </ChunkyButton>
+        <CircleBtn onPress={() => router.back()} label="Done">
+          <IconCheck color={t.text} />
+        </CircleBtn>
       </View>
     </>
   );
@@ -147,7 +152,9 @@ function PomodoroTimer() {
   const advance = (chime: boolean) => {
     if (chime) {
       doneHaptic();
-      playStepDone();
+      // step-done chime marks a *focus* block completing (focus→break), not any
+      // phase flip — a break ending into focus gets the haptic only (P11)
+      if (phase === 'focus') playStepDone();
     }
     if (phase === 'focus') {
       const done = cycle + 1;

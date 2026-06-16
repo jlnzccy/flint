@@ -4,7 +4,8 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { IconChevR, IconTrash } from '@/components/icons';
+import { ColorPickerSheet } from '@/components/color-picker';
+import { IconChevR, IconPlus, IconTrash } from '@/components/icons';
 import { finishHaptic, tapHaptic, warnHaptic } from '@/lib/haptics';
 import { useToast } from '@/components/toast';
 import { Body, Display, Label, Segmented, Toggle } from '@/components/ui';
@@ -108,6 +109,8 @@ export default function Settings() {
   const settings = useStore((s) => s.settings);
   const accent = useStore((s) => s.accent);
   const { setSettings, setAccent } = useStore.getState();
+  const [accentOpen, setAccentOpen] = useState(false);
+  const customAccent = !ACCENT_CHOICES.includes(accent as (typeof ACCENT_CHOICES)[number]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
@@ -195,7 +198,37 @@ export default function Settings() {
                   }}
                 />
               ))}
+              {/* trailing custom slot — opens the picker, recolors in place (P17) */}
+              <Pressable
+                accessibilityLabel={customAccent ? 'Edit custom accent' : 'Custom accent'}
+                onPressIn={() => tapHaptic()}
+                onPress={() => setAccentOpen(true)}
+                style={{
+                  width: 40, height: 40, borderRadius: 20,
+                  backgroundColor: customAccent ? accent : t.raised,
+                  borderWidth: customAccent ? 3 : 2,
+                  borderColor: customAccent ? t.text : t.line,
+                  alignItems: 'center', justifyContent: 'center',
+                  transform: [{ scale: customAccent ? 1.12 : 1 }],
+                }}
+              >
+                {customAccent ? null : <IconPlus size={16} color={t.muted} />}
+              </Pressable>
             </View>
+
+            {/* Material You — visible tease only, applies nothing yet (P18) */}
+            <Pressable
+              accessibilityLabel="Material You"
+              onPressIn={() => tapHaptic()}
+              onPress={() => toast('Coming soon')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}
+            >
+              <View style={{ flex: 1 }}>
+                <Body size={14} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>Material You</Body>
+                <Body size={12} color={t.faint} style={{ marginTop: 1 }}>Match your wallpaper</Body>
+              </View>
+              <Body size={12} color={t.faint}>Coming soon</Body>
+            </Pressable>
           </View>
         </Card>
 
@@ -250,6 +283,14 @@ export default function Settings() {
 
         <HoldDelete />
       </ScrollView>
+
+      {/* custom accent picker (P17) — applies app-wide + persists via setAccent */}
+      <ColorPickerSheet
+        open={accentOpen}
+        initial={accent}
+        onClose={() => setAccentOpen(false)}
+        onPick={setAccent}
+      />
     </View>
   );
 }
