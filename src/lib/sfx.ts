@@ -19,6 +19,37 @@ function ensureMode() {
 
 let alarmPlayer: AudioPlayer | null = null;
 
+/* ── Warm one-shot players ──
+   The Done chime + celebration sting are short and fire on a tight beat, so we
+   keep a persistent, pre-decoded AudioPlayer alive for each instead of building
+   one per hit (createAudioPlayer decodes lazily → ~100–300ms late on first play).
+   Replay is just seekTo(0)+play(). Built once at module load, after ensureMode()
+   so setAudioModeAsync has a head start before the first play. */
+let stepDonePlayer: AudioPlayer | null = null;
+let celebrationPlayer: AudioPlayer | null = null;
+
+(function warmOneShots() {
+  ensureMode();
+  try {
+    stepDonePlayer = createAudioPlayer(STEP_DONE);
+    stepDonePlayer.volume = 0.8;
+  } catch {}
+  try {
+    celebrationPlayer = createAudioPlayer(CELEBRATIONS[0]);
+    celebrationPlayer.volume = 1;
+  } catch {}
+})();
+
+/* Replay a warmed player from the top. seekTo(0) lets rapid taps re-trigger
+   without waiting for the previous play to finish (short clips, rare overlap). */
+function fireWarm(player: AudioPlayer | null): void {
+  if (!player) return;
+  try {
+    player.seekTo(0);
+    player.play();
+  } catch {}
+}
+
 /* Loop the alarm tone until stopped. uri = a content:// ringtone the user picked
    in Settings, else the bundled marimba. */
 export function playAlarm(uri?: string | null): void {
@@ -48,31 +79,13 @@ export function stopAlarm(): void {
   } catch {}
 }
 
-/* Fire-and-forget one-shot: play src once, release the player when it finishes. */
-function playOneShot(src: number, volume = 1): void {
-  ensureMode();
-  try {
-    const player = createAudioPlayer(src);
-    player.volume = volume;
-    const sub = player.addListener('playbackStatusUpdate', (status) => {
-      if (status.didJustFinish) {
-        sub.remove();
-        try {
-          player.remove();
-        } catch {}
-      }
-    });
-    player.play();
-  } catch {}
-}
-
-/* One random celebration sting, released when it finishes playing. */
+/* Celebration sting — fires instantly off the warmed player. */
 export function playCelebration(): void {
-  playOneShot(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
+  fireWarm(celebrationPlayer);
 }
 
 /* Soft tick when a routine step is marked done (the final step plays the
    celebration sting instead). Quieter than the celebration so it stays gentle. */
 export function playStepDone(): void {
-  playOneShot(STEP_DONE, 0.8);
+  fireWarm(stepDonePlayer);
 }

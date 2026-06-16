@@ -116,7 +116,10 @@ const DEFAULT_SETTINGS: Settings = {
   streakNeverDies: true,
   theme: 'dark',
   clock: 'system',
-  remindersOn: true,
+  // opt-in: stays off until the user enables it (onboarding button / Settings →
+  // Reminders), so no OS permission dialog fires while building the first routine.
+  // Existing users keep their stored value — persist replaces this default wholesale.
+  remindersOn: false,
   reduceMotion: false,
 };
 

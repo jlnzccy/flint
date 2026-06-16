@@ -149,7 +149,9 @@ export default function Player() {
   // still pings if the app is backgrounded. Re-armed on step change, +1 min, restart,
   // and pause/resume; cancelled on cleanup.
   useEffect(() => {
-    if (phase !== 'play' || paused || !routine || !step) return;
+    // gate on remindersOn so a running step never triggers a cold OS permission
+    // prompt when notifications are opt-in / off (P16).
+    if (!settings.remindersOn || phase !== 'play' || paused || !routine || !step) return;
     const left = target - elapsedRef.current;
     if (left <= 0) return;
     let live = true;
@@ -163,7 +165,7 @@ export default function Player() {
       cancelTimerAlert(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, phase, paused, extra, restartN]);
+  }, [idx, phase, paused, extra, restartN, settings.remindersOn]);
 
   useEffect(() => {
     if (!routine || phase !== 'play') return;
