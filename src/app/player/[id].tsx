@@ -3,7 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, FadeIn, SlideInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming, ZoomIn } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { Easing, FadeIn, runOnJS, SlideInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
@@ -253,6 +254,16 @@ export default function Player() {
     setPaused(false);
   };
 
+  // swipe right over the player body → previous step (T2). Horizontal-only (fails on
+  // vertical) so it doesn't fight the paused "Still to go" list or button taps; goBack
+  // already taps a haptic + no-ops at step 1, and the celebrate phase never mounts this.
+  const swipeBack = Gesture.Pan()
+    .activeOffsetX(24)
+    .failOffsetY([-18, 18])
+    .onEnd((e) => {
+      if (e.translationX > 56 && idx > 0) runOnJS(goBack)();
+    });
+
   /* ── celebration ── */
   if (phase === 'celebrate' && stats) {
     const headline = stats.headline;
@@ -339,11 +350,16 @@ export default function Player() {
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       {settings.keepOn && <KeepAwake />}
 
-      {/* top bar — Back left (previous step, or exit at step 1), X (exit) right */}
+      {/* top bar — "<" is previous-step only (hidden at step 1 so it never duplicates the
+          X); X is the sole exit (T1). Empty slot at step 1 keeps the title centered. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
-        <CircleBtn size={44} onPress={() => (idx > 0 ? goBack() : setExitConfirm(true))} label={idx > 0 ? 'Previous step' : 'Exit'}>
-          <IconChevL color={t.text} />
-        </CircleBtn>
+        {idx > 0 ? (
+          <CircleBtn size={44} onPress={goBack} label="Previous step">
+            <IconChevL color={t.text} />
+          </CircleBtn>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
         <View style={{ flex: 1, alignItems: 'center', marginHorizontal: 8 }}>
           <Display size={16} numberOfLines={1} style={{ color: t.muted, textAlign: 'center' }}>
             {routine.emoji} {routine.name}
@@ -374,7 +390,8 @@ export default function Player() {
         ))}
       </Pressable>
 
-      {/* main area */}
+      {/* main area — swipe right here = previous step (T2) */}
+      <GestureDetector gesture={swipeBack}>
       <View key={idx} style={{ flex: 1, alignItems: 'center', paddingHorizontal: 24 }}>
         {/* fixed-height prompt so the ring + controls never shift between steps */}
         <Animated.View entering={FadeIn.duration(250)} style={{ height: 124, justifyContent: 'center', alignItems: 'center', marginTop: 6 }}>
@@ -410,9 +427,9 @@ export default function Player() {
           <Label color={t.faint}>{`${step.min} min${extra ? ` +${extra / 60}` : ''}`}</Label>
         </View>
 
-        {/* next step — readable, right under the timer (P14) */}
-        <Body size={16} color={t.muted} numberOfLines={1} style={{ marginTop: 12, textAlign: 'center', maxWidth: 320 }}>
-          {idx + 1 < steps.length ? `Next: ${idx + 2}. ${steps[idx + 1].t}` : 'Last step — downhill from here'}
+        {/* next step — no number, more presence but still under the current step (T3) */}
+        <Body size={19} color={t.text} numberOfLines={1} style={{ marginTop: 12, textAlign: 'center', maxWidth: 320 }}>
+          {idx + 1 < steps.length ? `Next: ${steps[idx + 1].t}` : 'Last step — downhill from here'}
         </Body>
 
         {/* controls sit low, well clear of the clock */}
@@ -463,6 +480,7 @@ export default function Player() {
         )}
         </View>
       </View>
+      </GestureDetector>
 
       {/* bottom controls */}
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: insets.bottom + 18 }}>
