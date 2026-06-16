@@ -15,7 +15,7 @@ import { Slider } from '@/components/slider';
 import { TimePicker } from '@/components/time-picker';
 import { useToast } from '@/components/toast';
 import { Body, Chip, Display, FlintInput, Label, Segmented, Toggle, useTimeFmt } from '@/components/ui';
-import { buildPomodoroSteps, COLOR_CHOICES, EMOJI_CHOICES, getTemplate, routineMin, Routine, RoutinePomodoro } from '@/data/defaults';
+import { buildPomodoroSteps, COLOR_CHOICES, DEFAULT_POMODORO_CFG, EMOJI_CHOICES, getTemplate, routineMin, Routine, RoutinePomodoro } from '@/data/defaults';
 import { confirmDestructive } from '@/lib/confirm';
 import { tapHaptic } from '@/lib/haptics';
 import { resolveRoutines, useStore } from '@/state/store';
@@ -105,7 +105,9 @@ export default function Editor() {
 
   // Pomodoro routine? steps are derived from this config (W3). Seeds from the edited
   // routine or the Pomodoro template; null = an ordinary step-list routine.
-  const pomoSeed = routine?.pomodoro ?? tpl?.pomodoro ?? null;
+  const pomoSeed = routine?.pomodoro
+    ? { ...DEFAULT_POMODORO_CFG, ...routine.pomodoro } // backfill any new config fields
+    : tpl?.pomodoro ?? null;
   const isPomo = !!pomoSeed;
   const [pomo, setPomo] = useState<RoutinePomodoro | null>(pomoSeed);
   // a slider change rebuilds the focus/break steps in place
@@ -263,6 +265,9 @@ export default function Editor() {
         <Label style={{ marginBottom: 8 }}>Name</Label>
         <FlintInput placeholder="e.g. Laundry, but survivable" value={name} onChangeText={setName} maxLength={32} />
 
+        {!isPomo && (
+          /* Pomodoro's icon + color are locked (🍅 tomato) — hidden during edit */
+          <>
         <Label style={{ marginTop: 20, marginBottom: 8 }}>Icon</Label>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {EMOJI_CHOICES.slice(0, 6).map((em) => (
@@ -345,6 +350,8 @@ export default function Editor() {
             {customColor ? null : <IconPlus size={16} color={t.muted} />}
           </Pressable>
         </View>
+          </>
+        )}
 
         <Label style={{ marginTop: 20, marginBottom: 8 }}>Schedule</Label>
         <Segmented
@@ -462,10 +469,11 @@ export default function Editor() {
             <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, gap: 18 }}>
               <PomoSliderRow label="Sessions" sub="focus blocks" value={pomo.sessions} min={2} max={8} step={1} color={c.main} onChange={(v) => setPomoField({ sessions: v })} />
               <PomoSliderRow label="Focus" value={pomo.focusMin} unit="min" min={5} max={60} step={5} color={c.main} onChange={(v) => setPomoField({ focusMin: v })} />
-              <PomoSliderRow label="Break" sub="between sessions" value={pomo.breakMin} unit="min" min={1} max={20} step={1} color={c.main} onChange={(v) => setPomoField({ breakMin: v })} />
+              <PomoSliderRow label="Short break" value={pomo.breakMin} unit="min" min={1} max={20} step={1} color={c.main} onChange={(v) => setPomoField({ breakMin: v })} />
+              <PomoSliderRow label="Long break" sub={`after every ${pomo.longEvery} focus`} value={pomo.longBreakMin} unit="min" min={5} max={45} step={5} color={c.main} onChange={(v) => setPomoField({ longBreakMin: v })} />
             </View>
             <Body size={12} color={t.faint} style={{ marginTop: 10, textAlign: 'center' }}>
-              {pomo.sessions} focus · {pomo.sessions - 1} break{pomo.sessions === 2 ? '' : 's'} · {routineMin({ steps })} min total
+              {steps.filter((s) => s.t === 'Focus').length} focus · {steps.filter((s) => s.t !== 'Focus').length} break{steps.filter((s) => s.t !== 'Focus').length === 1 ? '' : 's'} · {routineMin({ steps })} min total
             </Body>
           </>
         ) : (

@@ -10,8 +10,10 @@ export interface Step {
    with a break between each (N focus → N-1 breaks) — never hand-edited. */
 export interface RoutinePomodoro {
   focusMin: number;
-  breakMin: number;
+  breakMin: number; // short break between focus blocks
+  longBreakMin: number; // long break after a full set
   sessions: number; // number of focus blocks
+  longEvery: number; // a long break follows every Nth focus block (classic = 4)
 }
 
 export interface Routine {
@@ -30,15 +32,26 @@ export interface Routine {
   builtin?: boolean;
 }
 
-export const DEFAULT_POMODORO_CFG: RoutinePomodoro = { focusMin: 25, breakMin: 5, sessions: 4 };
+export const DEFAULT_POMODORO_CFG: RoutinePomodoro = { focusMin: 25, breakMin: 5, longBreakMin: 15, sessions: 4, longEvery: 4 };
 
-/* Generate the focus/break step list from a Pomodoro config: breaks sit *between*
-   focus blocks only, so N focus blocks produce N-1 breaks (W). */
+/* Generate the focus/break step list from a Pomodoro config. A break follows each focus
+   block; it's a *long* break when the focus count is a multiple of `longEvery`, so a
+   completed set winds down on the long break (proper Pomodoro). A trailing non-long
+   break is dropped, so a routine ends on focus or on a long break, never a short one. */
 export const buildPomodoroSteps = (cfg: RoutinePomodoro): Step[] => {
   const steps: Step[] = [];
+  const longEvery = cfg.longEvery || 4;
+  const longBreakMin = cfg.longBreakMin ?? cfg.breakMin;
   for (let i = 0; i < cfg.sessions; i++) {
     steps.push({ t: 'Focus', min: cfg.focusMin, hint: i === 0 ? 'One thing. Start small.' : undefined });
-    if (i < cfg.sessions - 1) steps.push({ t: 'Break', min: cfg.breakMin, hint: 'Stretch, water, look away.' });
+    const done = i + 1;
+    const isLast = done === cfg.sessions;
+    const long = done % longEvery === 0;
+    if (long) {
+      steps.push({ t: 'Long break', min: longBreakMin, hint: isLast ? 'Set done. Step away properly.' : 'Step away properly.' });
+    } else if (!isLast) {
+      steps.push({ t: 'Break', min: cfg.breakMin, hint: 'Stretch, water, look away.' });
+    }
   }
   return steps;
 };
