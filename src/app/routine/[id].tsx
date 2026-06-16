@@ -5,11 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
-import { IconBell, IconDots, IconPencil, IconX } from '@/components/icons';
+import { IconBell, IconClock, IconDots, IconPencil, IconX } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { useToast } from '@/components/toast';
-import { Body, Chip, Display, StepperBtn, useTimeFmt } from '@/components/ui';
+import { Body, Chip, Display, Label, StepperBtn, Toggle, useTimeFmt } from '@/components/ui';
 import { routineMin } from '@/data/defaults';
+import { addMins, nowHHMM } from '@/lib/dates';
 import { tapHaptic } from '@/lib/haptics';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
@@ -49,6 +50,11 @@ export default function RoutineDetail() {
     router.replace(`/player/${routine.id}${q}`);
   };
 
+  // per-routine run settings — store update re-resolves `routine`, so the
+  // toggles read straight off it (no local state). Player honors these (E4/E5).
+  const patch = (p: { autoAdvance?: boolean; warn30?: boolean }) =>
+    useStore.getState().saveRoutine({ ...routine, ...p });
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       {/* top bar */}
@@ -80,12 +86,21 @@ export default function RoutineDetail() {
           <Body size={15} color={t.muted} style={{ marginTop: 6 }}>
             {routine.steps.length} steps · {routineMin(routine)} min · just start the first
           </Body>
-          {settings.remindersOn && routine.reminder ? (
-            <Chip style={{ marginTop: 12 }}>
-              <IconBell size={15} color={t.text} />
-              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>{fmtT(routine.reminder)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+            {/* estimated finish window — now → now + total (D1) */}
+            <Chip style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+              <IconClock size={14} color={t.text} />
+              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>
+                {fmtT(nowHHMM())} – {fmtT(addMins(nowHHMM(), routineMin(routine)))}
+              </Text>
             </Chip>
-          ) : null}
+            {settings.remindersOn && routine.reminder ? (
+              <Chip style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+                <IconBell size={15} color={t.text} />
+                <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>{fmtT(routine.reminder)}</Text>
+              </Chip>
+            ) : null}
+          </View>
         </View>
 
         <View style={{ gap: 10, marginTop: 24 }}>
@@ -119,6 +134,34 @@ export default function RoutineDetail() {
               <Body size={13} color={t.faint}>{s.min} min</Body>
             </View>
           ))}
+        </View>
+
+        <Label style={{ marginTop: 26, marginBottom: 8 }}>This routine</Label>
+        <View style={{ gap: 10 }}>
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+              backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Display size={15}>Auto-advance</Display>
+              <Body size={12} color={t.faint} style={{ marginTop: 2 }}>Move to the next step at zero.</Body>
+            </View>
+            <Toggle on={!!routine.autoAdvance} onChange={(v) => patch({ autoAdvance: v })} />
+          </View>
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+              backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Display size={15}>30-second warning</Display>
+              <Body size={12} color={t.faint} style={{ marginTop: 2 }}>A nudge before each step ends.</Body>
+            </View>
+            <Toggle on={!!routine.warn30} onChange={(v) => patch({ warn30: v })} />
+          </View>
         </View>
       </ScrollView>
 

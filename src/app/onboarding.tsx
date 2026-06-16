@@ -1,20 +1,21 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
-import { ChunkyButton } from '@/components/chunky';
+import { ChunkyButton, ChunkyCard } from '@/components/chunky';
 import { FireAnim } from '@/components/fire-anim';
 import { IconCheck, IconPlus } from '@/components/icons';
 import { StepPicker } from '@/components/new-routine-sheet';
 import { BottomSheet } from '@/components/sheet';
-import { Body, Display, EmojiTile, Label, Segmented, Toggle } from '@/components/ui';
+import { Body, Display, EmojiTile, Label } from '@/components/ui';
 import { ROUTINE_TEMPLATES, RoutineTemplate, routineMin } from '@/data/defaults';
 import { tapHaptic } from '@/lib/haptics';
 import { ensurePermission, hasNotificationPermission } from '@/lib/notifications';
 import { useToast } from '@/components/toast';
-import { ACCENT_CHOICES } from '@/theme/colors';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 
@@ -23,8 +24,8 @@ const SLIDES = [
   { title: 'Start with step one', body: 'Each routine breaks into small timed steps. Open it, do the first tiny thing. That’s the whole trick.', emoji: '🎯' },
 ];
 
-// welcome + intro slides + look + streaks + reminders + starter
-const PAGES = 1 + SLIDES.length + 3 + 1;
+// welcome + intro slides + reminders + starter
+const PAGES = 1 + SLIDES.length + 1 + 1;
 
 // centers a short page's content vertically so it doesn't strand a wall of empty space
 const PAGE = { flexGrow: 1, justifyContent: 'center' as const, paddingHorizontal: 24, paddingVertical: 24 };
@@ -44,6 +45,23 @@ function PageHero({ emoji, animated }: { emoji: string; animated?: boolean }) {
   );
 }
 
+/* Page dot — animates its width + color on the active transition (M1). Honors
+   reduce-motion: when calmed, the change snaps (duration 0). */
+function Dot({ active }: { active: boolean }) {
+  const t = useTheme();
+  const reduce = useReducedMotion();
+  const on = t.accent.main;
+  const off = t.line;
+  const anim = useAnimatedStyle(() => {
+    const d = reduce ? 0 : 220;
+    return {
+      width: withTiming(active ? 22 : 7, { duration: d }),
+      backgroundColor: withTiming(active ? on : off, { duration: d }),
+    };
+  });
+  return <Animated.View style={[{ height: 7, borderRadius: 4 }, anim]} />;
+}
+
 export default function Onboarding() {
   const t = useTheme();
   const router = useRouter();
@@ -51,10 +69,8 @@ export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
-  const settings = useStore((s) => s.settings);
-  const accent = useStore((s) => s.accent);
   const complete = useStore((s) => s.completeOnboarding);
-  const { setSettings, setAccent } = useStore.getState();
+  const { setSettings } = useStore.getState();
 
   const ref = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
@@ -93,11 +109,6 @@ export default function Onboarding() {
     } else {
       toast('Allow it in system settings');
     }
-  };
-
-  const toggleStreaks = (v: boolean) => {
-    // streaks on → never-dies on by default, so a missed day never resets it
-    setSettings({ streaks: v, streakNeverDies: v ? true : settings.streakNeverDies });
   };
 
   return (
@@ -142,65 +153,6 @@ export default function Onboarding() {
           </View>
         ))}
 
-        {/* look — theme + accent */}
-        <View style={{ width }}>
-          <ScrollView contentContainerStyle={PAGE} showsVerticalScrollIndicator={false}>
-            <PageHero emoji="🎨" animated />
-            <Display size={26} style={{ textAlign: 'center' }}>The look</Display>
-            <Body size={14.5} color={t.muted} style={{ textAlign: 'center', marginTop: 10, marginBottom: 28, lineHeight: 21 }}>
-              Pick a vibe. Change it any time in Settings.
-            </Body>
-
-            <Label style={{ marginBottom: 8 }}>Appearance</Label>
-            <Segmented
-              value={settings.theme === 'light' ? 'light' : 'dark'}
-              onChange={(v) => setSettings({ theme: v })}
-              options={[
-                { value: 'dark', label: '🌙 Dark' },
-                { value: 'light', label: '☀️ Light' },
-              ]}
-            />
-
-            <Label style={{ marginTop: 26, marginBottom: 14 }}>Accent</Label>
-            <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              {ACCENT_CHOICES.map((a) => (
-                <Pressable
-                  key={a}
-                  accessibilityLabel={a}
-                  onPress={() => {
-                    tapHaptic();
-                    setAccent(a);
-                  }}
-                  style={{
-                    width: 50, height: 50, borderRadius: 25, backgroundColor: a,
-                    borderWidth: 3, borderColor: a === accent ? t.text : 'transparent',
-                    transform: [{ scale: a === accent ? 1.12 : 1 }],
-                  }}
-                />
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* streaks */}
-        <View style={{ width }}>
-          <ScrollView contentContainerStyle={PAGE} showsVerticalScrollIndicator={false}>
-            <PageHero emoji="🔥" animated />
-            <Display size={26} style={{ textAlign: 'center' }}>Streaks?</Display>
-            <Body size={14.5} color={t.muted} style={{ textAlign: 'center', marginTop: 10, marginBottom: 28, lineHeight: 21 }}>
-              Some brains love a streak. Some feel chased by it. Your call.
-            </Body>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 20 }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Display size={16}>Count my streak</Display>
-                <Body size={12.5} color={t.faint} style={{ marginTop: 3 }}>Never dies — a missed day pauses it, never resets.</Body>
-              </View>
-              <Toggle on={settings.streaks} onChange={toggleStreaks} />
-            </View>
-          </ScrollView>
-        </View>
-
         {/* reminders */}
         <View style={{ width }}>
           <ScrollView contentContainerStyle={PAGE} showsVerticalScrollIndicator={false}>
@@ -242,21 +194,16 @@ export default function Onboarding() {
               {ROUTINE_TEMPLATES.map((tpl) => {
                 const c = t.col(tpl.color);
                 return (
-                  <Pressable
+                  <ChunkyCard
                     key={tpl.id}
-                    onPress={() => {
-                      tapHaptic();
-                      setPickTpl(tpl);
-                    }}
-                    style={{
-                      width: '47%', padding: 14, borderRadius: 18,
-                      backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft,
-                    }}
+                    onPress={() => setPickTpl(tpl)}
+                    style={{ width: '47%' }}
+                    faceStyle={{ padding: 14 }}
                   >
                     <EmojiTile emoji={tpl.emoji} size={44} radius={13} soft={c.soft} border={c.main} />
                     <Display size={15} style={{ marginTop: 10 }}>{tpl.name}</Display>
                     <Body size={12} color={t.faint} style={{ marginTop: 2 }}>{tpl.steps.length} steps · {routineMin(tpl)} min</Body>
-                  </Pressable>
+                  </ChunkyCard>
                 );
               })}
             </View>
@@ -275,13 +222,7 @@ export default function Onboarding() {
       <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 20, paddingTop: 12, gap: 18 }}>
         <View style={{ flexDirection: 'row', gap: 7, justifyContent: 'center' }}>
           {Array.from({ length: PAGES }, (_, i) => (
-            <View
-              key={i}
-              style={{
-                width: i === page ? 22 : 7, height: 7, borderRadius: 4,
-                backgroundColor: i === page ? t.accent.main : t.line,
-              }}
-            />
+            <Dot key={i} active={i === page} />
           ))}
         </View>
         {page < PAGES - 1 && (

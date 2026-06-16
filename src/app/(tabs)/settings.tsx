@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
-import * as IntentLauncher from 'expo-intent-launcher';
-import React from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { IconChevR, IconRestart } from '@/components/icons';
-import { tapHaptic } from '@/lib/haptics';
+import { IconChevR, IconTrash } from '@/components/icons';
+import { finishHaptic, tapHaptic, warnHaptic } from '@/lib/haptics';
 import { useToast } from '@/components/toast';
 import { Body, Display, Label, Segmented, Toggle } from '@/components/ui';
 import { ACCENT_CHOICES } from '@/theme/colors';
@@ -31,6 +31,75 @@ function Card({ children }: { children: React.ReactNode }) {
   return <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18 }}>{children}</View>;
 }
 
+// Delete-all (H4): hold to confirm. A tap fires onPressIn→onPressOut almost
+// instantly, cancels before HOLD_MS, and does nothing — only a sustained hold
+// fills the bar and wipes. resetAll() flips onboarded → the navigator guard
+// swaps back to onboarding on its own (no manual nav).
+const HOLD_MS = 1500;
+
+function HoldDelete() {
+  const t = useTheme();
+  const toast = useToast();
+  const fill = useSharedValue(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [holding, setHolding] = useState(false);
+
+  const cancel = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    setHolding(false);
+    fill.value = withTiming(0, { duration: 160 });
+  };
+  const start = () => {
+    setHolding(true);
+    warnHaptic();
+    fill.value = withTiming(1, { duration: HOLD_MS });
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      setHolding(false);
+      fill.value = 0;
+      finishHaptic();
+      useStore.getState().resetAll();
+      toast('Erased');
+    }, HOLD_MS);
+  };
+  // never leave a timer running if the screen unmounts mid-hold
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  const fillStyle = useAnimatedStyle(() => ({ width: `${fill.value * 100}%` }));
+
+  return (
+    <>
+      <Pressable
+        onPressIn={start}
+        onPressOut={cancel}
+        accessibilityLabel="Hold to delete all data"
+        style={{
+          marginTop: 26, height: 56, borderRadius: 18, overflow: 'hidden',
+          borderWidth: 2, borderColor: t.accent.main, backgroundColor: t.surface,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+        }}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[{ position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: t.accent.main, opacity: 0.22 }, fillStyle]}
+        />
+        <IconTrash size={16} color={t.accent.main} />
+        <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 14, color: t.accent.main, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+          {holding ? 'Keep holding…' : 'Hold to delete all data'}
+        </Text>
+      </Pressable>
+      <Body size={12} color={t.faint} style={{ textAlign: 'center', marginTop: 8 }}>
+        Erases everything and starts over. Can't be undone.
+      </Body>
+    </>
+  );
+}
+
 export default function Settings() {
   const t = useTheme();
   const toast = useToast();
@@ -40,37 +109,13 @@ export default function Settings() {
   const accent = useStore((s) => s.accent);
   const { setSettings, setAccent } = useStore.getState();
 
-  // Android ringtone picker → store the chosen alarm URI (iOS has no public API)
-  const pickRingtone = async () => {
-    if (Platform.OS !== 'android') {
-      toast('Android only');
-      return;
-    }
-    try {
-      const res = await IntentLauncher.startActivityAsync('android.intent.action.RINGTONE_PICKER', {
-        extra: {
-          'android.intent.extra.ringtone.TYPE': 4, // TYPE_ALARM
-          'android.intent.extra.ringtone.SHOW_DEFAULT': true,
-          'android.intent.extra.ringtone.SHOW_SILENT': false,
-          'android.intent.extra.ringtone.TITLE': 'Alarm sound',
-        },
-      });
-      const picked = (res.extra as Record<string, any> | undefined)?.['android.intent.extra.ringtone.PICKED_URI'] ?? res.data;
-      if (res.resultCode === IntentLauncher.ResultCode.Success && picked) {
-        setSettings({ alarmRingtoneUri: String(picked) });
-        toast('Alarm sound set');
-      }
-    } catch {
-      toast("Couldn't open picker");
-    }
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
         <Display size={30}>Settings</Display>
-
-        <Label style={{ marginTop: 24, marginBottom: 8 }}>Reminders</Label>
+      </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+        <Label style={{ marginTop: 20, marginBottom: 8 }}>Reminders</Label>
         <Card>
           <Row title="Reminders" top>
             <Toggle
@@ -89,27 +134,6 @@ export default function Settings() {
           </Row>
         </Card>
 
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Sounds</Label>
-        <Card>
-          <Pressable onPress={pickRingtone}>
-            <Row title="Alarm sound" sub={settings.alarmRingtoneUri ? 'Custom ringtone' : 'Marimba (default)'} top>
-              <IconChevR size={18} color={t.faint} />
-            </Row>
-          </Pressable>
-          {settings.alarmRingtoneUri ? (
-            <Pressable
-              onPress={() => {
-                setSettings({ alarmRingtoneUri: null });
-                toast('Back to default');
-              }}
-            >
-              <Row title="Use app default" sub="Bundled marimba">
-                <IconRestart size={16} color={t.faint} />
-              </Row>
-            </Pressable>
-          ) : null}
-        </Card>
-
         <Label style={{ marginTop: 22, marginBottom: 8 }}>Feedback</Label>
         <Card>
           <Row title="Haptics" top>
@@ -118,22 +142,6 @@ export default function Settings() {
           <Row title="Voice guide" sub="Reads each step aloud">
             <Toggle on={settings.voice} onChange={(v) => setSettings({ voice: v })} />
           </Row>
-          <Pressable onPress={() => router.push('/haptics-lab' as never)}>
-            <Row title="Haptics lab" sub="Feel each cue, pick the crisp ones">
-              <IconChevR size={18} color={t.faint} />
-            </Row>
-          </Pressable>
-          <View style={{ padding: 16, borderTopWidth: 2, borderColor: t.lineSoft, gap: 12 }}>
-            <Display size={16}>Celebration</Display>
-            <Segmented
-              value={settings.celebrate}
-              onChange={(v) => setSettings({ celebrate: v })}
-              options={[
-                { value: 'calm', label: 'Calm' },
-                { value: 'extra', label: 'Extra' },
-              ]}
-            />
-          </View>
         </Card>
 
         <Label style={{ marginTop: 22, marginBottom: 8 }}>Display</Label>
@@ -155,6 +163,9 @@ export default function Settings() {
           </Row>
           <Row title="Count-up timer" sub="Ring fills instead of drains">
             <Toggle on={settings.countUp} onChange={(v) => setSettings({ countUp: v })} />
+          </Row>
+          <Row title="Reduce motion" sub="Calm the pulsing and animations">
+            <Toggle on={settings.reduceMotion} onChange={(v) => setSettings({ reduceMotion: v })} />
           </Row>
           <View style={{ padding: 16, borderTopWidth: 2, borderColor: t.lineSoft, gap: 12 }}>
             <Display size={16}>Clock</Display>
@@ -200,6 +211,35 @@ export default function Settings() {
           )}
         </Card>
 
+        <Label style={{ marginTop: 22, marginBottom: 8 }}>Demo</Label>
+        <Card>
+          <Pressable
+            onPress={() => {
+              useStore.getState().loadDemo();
+              finishHaptic();
+              toast('Demo loaded');
+            }}
+          >
+            <Row title="Load demo data" sub="Sample routines, tasks & a month of insights" top>
+              <IconChevR size={18} color={t.faint} />
+            </Row>
+          </Pressable>
+        </Card>
+
+        <Label style={{ marginTop: 22, marginBottom: 8 }}>Experimental</Label>
+        <Card>
+          <Pressable onPress={() => router.push('/sounds' as never)}>
+            <Row title="Sounds" sub="Brainwave tones to settle in or lock on" top>
+              <IconChevR size={18} color={t.faint} />
+            </Row>
+          </Pressable>
+          <Pressable onPress={() => router.push('/haptics-lab' as never)}>
+            <Row title="Haptics lab" sub="Feel each cue, pick the crisp ones">
+              <IconChevR size={18} color={t.faint} />
+            </Row>
+          </Pressable>
+        </Card>
+
         <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 18, marginTop: 26, alignItems: 'center' }}>
           <Text style={{ fontSize: 26 }}>🔥</Text>
           <Body size={14} color={t.muted} style={{ textAlign: 'center', marginTop: 8 }}>
@@ -207,6 +247,8 @@ export default function Settings() {
           </Body>
           <Display size={14} style={{ marginTop: 2 }}>Built by an ADHD brain, for ADHD brains</Display>
         </View>
+
+        <HoldDelete />
       </ScrollView>
     </View>
   );

@@ -98,6 +98,20 @@ export function minsUntil(hhmm?: string | null): number {
   return h * 60 + m - (now.getHours() * 60 + now.getMinutes());
 }
 
+/* current wall-clock time as "HH:MM" */
+export function nowHHMM(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/* add minutes to a "HH:MM", wrapping past midnight → "HH:MM". Shared finish-window
+   math for the pre-start screen (D1) and Today cards (N1). */
+export function addMins(hhmm: string, mins: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = (((h * 60 + m + mins) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
 /* parse a trailing "@ 9:00am" / "@21:30" / "@9am" time flag on a task */
 export function parseTaskTime(raw: string): { text: string; time: string | null } {
   const m = raw.match(/@\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*$/i);

@@ -1,9 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, Vibration, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -14,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { tapHaptic } from '@/lib/haptics';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { playAlarm, stopAlarm } from '@/lib/sfx';
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { ChunkyButton } from '@/components/chunky';
@@ -25,30 +29,43 @@ import { hexDarken } from '@/theme/colors';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 
-/* Concentric pulse behind the emoji — a radial gradient of the routine's own color
-   that breathes (scale + opacity) like the rings in the reference. Gradient, not
-   flat bands, so the edges stay soft. */
+/* Concentric pulse behind the emoji — a radial gradient of the routine's own color.
+   A rhythmic pulse (G1): a quick swell, then a longer settle inward — "falling into
+   a hole", not a slow even breathe. Durations stay >400ms so it never strobes.
+   Honors reduce-motion: holds a calm static glow instead. */
 function PulseGlow({ color }: { color: string }) {
   const { width, height } = useWindowDimensions();
+  const reduce = useReducedMotion();
   const size = Math.max(width, height) * 1.5;
-  const scale = useSharedValue(0.82);
-  const o = useSharedValue(0.45);
+  const scale = useSharedValue(reduce ? 1 : 0.78);
+  const o = useSharedValue(reduce ? 0.6 : 0.45);
   useEffect(() => {
+    if (reduce) {
+      cancelAnimation(scale);
+      cancelAnimation(o);
+      scale.value = withTiming(1, { duration: 260 });
+      o.value = withTiming(0.6, { duration: 260 });
+      return;
+    }
     scale.value = withRepeat(
       withSequence(
-        withTiming(1.12, { duration: 2100, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.82, { duration: 2100, easing: Easing.inOut(Easing.ease) })
+        withTiming(1.12, { duration: 460, easing: Easing.out(Easing.cubic) }),
+        withTiming(0.78, { duration: 820, easing: Easing.in(Easing.cubic) })
       ),
       -1
     );
     o.value = withRepeat(
       withSequence(
-        withTiming(0.92, { duration: 2100, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.45, { duration: 2100, easing: Easing.inOut(Easing.ease) })
+        withTiming(0.9, { duration: 460, easing: Easing.out(Easing.cubic) }),
+        withTiming(0.4, { duration: 820, easing: Easing.in(Easing.cubic) })
       ),
       -1
     );
-  }, [scale, o]);
+    return () => {
+      cancelAnimation(scale);
+      cancelAnimation(o);
+    };
+  }, [scale, o, reduce]);
   const st = useAnimatedStyle(() => ({ opacity: o.value, transform: [{ scale: scale.value }] }));
   return (
     <Animated.View
@@ -84,7 +101,6 @@ export default function AlarmScreen() {
   }, [id]);
 
   const haptics = useStore((s) => s.settings.haptics);
-  const ringtoneUri = useStore((s) => s.settings.alarmRingtoneUri);
   const clock24 = resolveClock24(useStore((s) => s.settings.clock));
   const [now, setNow] = useState(new Date());
 
@@ -103,9 +119,9 @@ export default function AlarmScreen() {
   // closes (Start / Snooze / Not today all unmount it). Reminders stay sound-free.
   useEffect(() => {
     if (!routine || !routine.alarm) return;
-    playAlarm(ringtoneUri);
+    playAlarm(routine.alarmRingtoneUri ?? null);
     return () => stopAlarm();
-  }, [routine, ringtoneUri]);
+  }, [routine]);
 
   if (!routine) {
     router.back();
@@ -117,6 +133,24 @@ export default function AlarmScreen() {
     stopAlarm();
     Vibration.cancel();
   };
+  // shared by the buttons and the swipe gestures (G2): down → snooze, up → stop
+  const snooze = () => {
+    silence();
+    router.back();
+    toast('Snoozed 5 min');
+  };
+  const stop = () => {
+    silence();
+    useStore.getState().bump(routine.id);
+    router.back();
+    toast('See you tomorrow');
+  };
+  // swipe down = snooze, swipe up = stop. Tap targets still work — Pan only
+  // recognizes on real drag, so it doesn't swallow button presses.
+  const pan = Gesture.Pan().onEnd((e) => {
+    if (e.translationY > 70 || e.velocityY > 700) runOnJS(snooze)();
+    else if (e.translationY < -70 || e.velocityY < -700) runOnJS(stop)();
+  });
   const c = t.col(routine.color);
   const hh = now.getHours();
   const mm = now.getMinutes();
@@ -126,6 +160,7 @@ export default function AlarmScreen() {
   const ampm = clock24 ? null : hh < 12 ? 'AM' : 'PM';
 
   return (
+    <GestureDetector gesture={pan}>
     <View style={{ flex: 1, backgroundColor: hexDarken(c.deep, 0.5) }}>
       <PulseGlow color={c.main} />
 
@@ -160,6 +195,9 @@ export default function AlarmScreen() {
 
         {/* footer — start + secondary actions */}
         <View style={{ gap: 12 }}>
+          <Body size={12.5} color="rgba(255,255,255,0.6)" style={{ textAlign: 'center' }}>
+            Swipe up to stop · down to snooze
+          </Body>
           <ChunkyButton
             color={c.main}
             deep={c.deep}
@@ -176,11 +214,7 @@ export default function AlarmScreen() {
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Pressable
               onPressIn={() => tapHaptic()}
-              onPress={() => {
-                silence();
-                router.back();
-                toast('Snoozed 5 min');
-              }}
+              onPress={snooze}
               style={{
                 flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center',
                 backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)',
@@ -192,12 +226,7 @@ export default function AlarmScreen() {
             </Pressable>
             <Pressable
               onPressIn={() => tapHaptic()}
-              onPress={() => {
-                silence();
-                useStore.getState().bump(routine.id);
-                router.back();
-                toast('See you tomorrow');
-              }}
+              onPress={stop}
               style={{
                 flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center',
                 backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)',
@@ -211,5 +240,6 @@ export default function AlarmScreen() {
         </View>
       </View>
     </View>
+    </GestureDetector>
   );
 }

@@ -2,10 +2,11 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
-import { IconAlarm, IconArchive, IconBell, IconCheck, IconPencil, IconTrash } from '@/components/icons';
+import { IconAlarm, IconArchive, IconBell, IconCheck, IconPencil, IconPlus, IconShare, IconTrash } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Chip, Display, EmojiTile, Label, useTimeFmt } from '@/components/ui';
 import { Routine, routineMin } from '@/data/defaults';
+import { addMins } from '@/lib/dates';
 import { useTheme } from '@/theme/theme';
 
 export function metaOf(r: Routine): string {
@@ -48,7 +49,8 @@ export function RoutineCard({ routine, done, bumped, remindersOn, readonly, onPr
             {!done && !bumped && remindersOn && routine.reminder ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                 {routine.alarm ? <IconAlarm size={13} color={t.faint} /> : <IconBell size={13} color={t.faint} />}
-                <Body size={12} color={t.faint}>{fmtT(routine.reminder)}</Body>
+                {/* estimated window — start → start + total (N1) */}
+                <Body size={12} color={t.faint}>{fmtT(routine.reminder)} – {fmtT(addMins(routine.reminder, routineMin(routine)))}</Body>
               </View>
             ) : null}
             {!done && !bumped && !routine.reminder ? (
@@ -105,6 +107,8 @@ interface PreviewSheetProps {
   onStartOne: (r: Routine) => void;
   onMarkDone: (r: Routine) => void;
   onEdit: (r: Routine) => void;
+  onDuplicate: (r: Routine) => void;
+  onShare: (r: Routine) => void;
   onBump: (r: Routine) => void;
   onUnbump: (r: Routine) => void;
   onArchive: (r: Routine) => void;
@@ -113,7 +117,7 @@ interface PreviewSheetProps {
 }
 
 export function PreviewSheet({
-  routine, done, bumped, onClose, onOpen, onStartOne, onMarkDone, onEdit, onBump, onUnbump, onArchive, onDelete, onPreviewAlarm,
+  routine, done, bumped, onClose, onOpen, onStartOne, onMarkDone, onEdit, onDuplicate, onShare, onBump, onUnbump, onArchive, onDelete, onPreviewAlarm,
 }: PreviewSheetProps) {
   const t = useTheme();
   const fmtT = useTimeFmt();
@@ -169,6 +173,14 @@ export function PreviewSheet({
         <Chip onPress={act(onEdit)}>
           <IconPencil size={14} color={t.text} />
           <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>Edit</Text>
+        </Chip>
+        <Chip onPress={act(onDuplicate)}>
+          <IconPlus size={14} color={t.text} />
+          <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>Duplicate</Text>
+        </Chip>
+        <Chip onPress={act(onShare)}>
+          <IconShare size={14} color={t.text} />
+          <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>Share</Text>
         </Chip>
         {routine.alarm && (
           <Chip onPress={act(onPreviewAlarm)}>

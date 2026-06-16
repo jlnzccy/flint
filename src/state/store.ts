@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_ROUTINES, Routine } from '@/data/defaults';
+import { buildDemoData } from '@/data/demo';
 import { addDays, dateKey, todayKey } from '@/lib/dates';
 import { occursOn, Repeat } from '@/lib/repeat';
 import type { ToneConfig } from '@/lib/tones';
@@ -37,8 +38,19 @@ export interface Settings {
   theme: 'dark' | 'light' | 'system';
   clock: 'system' | '12' | '24'; // time display — 'system' follows the device's 12/24h setting
   remindersOn: boolean;
-  celebrate: 'calm' | 'extra';
-  alarmRingtoneUri: string | null; // null = bundled marimba; else a picked ringtone URI
+  reduceMotion: boolean; // calms pulsing/animated effects app-wide (also honors the OS setting)
+}
+
+/* Pomodoro mode on the Timer screen. ADHD-tuned: everything is user-controlled —
+   no single "right" interval. Defaults are the classic 25/5/15 but the point is to
+   adjust focus length to your attention window (10 min on a hard day is fine). */
+export interface PomodoroConfig {
+  focusMin: number;
+  shortBreakMin: number;
+  longBreakMin: number;
+  cyclesBeforeLong: number; // focus blocks before a long break
+  autoStartBreaks: boolean; // roll into the break automatically
+  autoStartFocus: boolean; // roll into the next focus automatically
 }
 
 interface FlintState {
@@ -61,6 +73,8 @@ interface FlintState {
   settings: Settings;
   sound: ToneConfig; // last-used Sounds tab config (persisted)
   soundPlaying: boolean; // transient: the tone engine is running right now
+  pomodoro: PomodoroConfig; // Timer-screen Pomodoro settings (persisted)
+  recentColors: string[]; // recently picked custom colors (most-recent first), for the picker
 
   rollover: () => void;
   completeOnboarding: () => void;
@@ -72,6 +86,7 @@ interface FlintState {
   unbump: (id: string) => void;
   recordSkip: (id: string, idx: number) => void;
   saveRoutine: (r: Routine) => void;
+  duplicateRoutine: (id: string) => void;
   archiveRoutine: (id: string) => void;
   restoreRoutine: (id: string) => void;
   deleteRoutine: (id: string) => void;
@@ -86,20 +101,32 @@ interface FlintState {
   setAccent: (hex: string) => void;
   setSound: (patch: Partial<ToneConfig>) => void;
   setSoundPlaying: (v: boolean) => void;
+  setPomodoro: (patch: Partial<PomodoroConfig>) => void;
+  pushRecentColor: (hex: string) => void;
+  resetAll: () => void; // wipe everything → back to a fresh install (Settings → Delete all data)
+  loadDemo: () => void; // seed believable routines/tasks/history (Settings → Demo)
 }
 
 const DEFAULT_SETTINGS: Settings = {
   haptics: true,
   voice: false,
   keepOn: true,
-  countUp: true,
+  countUp: false,
   streaks: true,
-  streakNeverDies: false,
+  streakNeverDies: true,
   theme: 'dark',
   clock: 'system',
   remindersOn: true,
-  celebrate: 'extra',
-  alarmRingtoneUri: null,
+  reduceMotion: false,
+};
+
+const DEFAULT_POMODORO: PomodoroConfig = {
+  focusMin: 25,
+  shortBreakMin: 5,
+  longBreakMin: 15,
+  cyclesBeforeLong: 4,
+  autoStartBreaks: true,
+  autoStartFocus: false,
 };
 
 const DEFAULT_SOUND: ToneConfig = {
@@ -114,28 +141,35 @@ const DEFAULT_SOUND: ToneConfig = {
 
 const isBuiltin = (id: string) => BUILTIN_ROUTINES.some((b) => b.id === id);
 
+/* fresh-install data (no actions) — the create() seed and resetAll() both start here */
+const freshData = () => ({
+  custom: [] as Routine[],
+  overrides: {} as Record<string, Partial<Routine>>,
+  order: [] as string[],
+  archived: [] as string[],
+  deleted: [] as string[],
+  doneMap: {} as Record<string, boolean>,
+  bumped: {} as Record<string, boolean>,
+  todos: [] as Todo[],
+  history: {} as Record<string, string[]>,
+  appDays: {} as Record<string, 1>,
+  skips: {} as Record<string, number>,
+  lastDay: todayKey(),
+  accent: '#ff6b35',
+  onboarded: false,
+  celebratedFirst: false,
+  showCelebration: false,
+  settings: DEFAULT_SETTINGS,
+  sound: DEFAULT_SOUND,
+  soundPlaying: false,
+  pomodoro: DEFAULT_POMODORO,
+  recentColors: [] as string[],
+});
+
 export const useStore = create<FlintState>()(
   persist(
     (set, get) => ({
-      custom: [],
-      overrides: {},
-      order: [],
-      archived: [],
-      deleted: [],
-      doneMap: {},
-      bumped: {},
-      todos: [],
-      history: {},
-      appDays: {},
-      skips: {},
-      lastDay: todayKey(),
-      accent: '#ff6b35',
-      onboarded: false,
-      celebratedFirst: false,
-      showCelebration: false,
-      settings: DEFAULT_SETTINGS,
-      sound: DEFAULT_SOUND,
-      soundPlaying: false,
+      ...freshData(),
 
       completeOnboarding: () => set({ onboarded: true }),
       markFirstCelebrated: () => set({ celebratedFirst: true }),
@@ -188,7 +222,7 @@ export const useStore = create<FlintState>()(
             return {
               overrides: {
                 ...s.overrides,
-                [r.id]: { name: r.name, emoji: r.emoji, color: r.color, steps: r.steps, reminder: r.reminder, alarm: r.alarm, days: r.days },
+                [r.id]: { name: r.name, emoji: r.emoji, color: r.color, steps: r.steps, reminder: r.reminder, alarm: r.alarm, days: r.days, autoAdvance: r.autoAdvance, warn30: r.warn30, alarmRingtoneUri: r.alarmRingtoneUri },
               },
             };
           }
@@ -196,6 +230,16 @@ export const useStore = create<FlintState>()(
           const custom = exists ? s.custom.map((x) => (x.id === r.id ? r : x)) : [...s.custom, r];
           const order = s.order.includes(r.id) || s.order.length === 0 ? s.order : [...s.order, r.id];
           return { custom, order };
+        }),
+
+      duplicateRoutine: (id) =>
+        set((s) => {
+          const src = resolveRoutines({ custom: s.custom, overrides: s.overrides, order: s.order, archived: [], deleted: s.deleted }).find((r) => r.id === id);
+          if (!src) return {};
+          const { builtin: _b, ...rest } = src;
+          const copy: Routine = { ...rest, id: 'c' + Date.now(), name: `${src.name} copy` };
+          const order = s.order.length === 0 ? s.order : [...s.order, copy.id];
+          return { custom: [...s.custom, copy], order };
         }),
 
       archiveRoutine: (id) =>
@@ -278,10 +322,25 @@ export const useStore = create<FlintState>()(
       setSound: (patch) => set((s) => ({ sound: { ...s.sound, ...patch } })),
 
       setSoundPlaying: (v) => set({ soundPlaying: v }),
+
+      setPomodoro: (patch) => set((s) => ({ pomodoro: { ...s.pomodoro, ...patch } })),
+
+      pushRecentColor: (hex) =>
+        set((s) => {
+          const h = hex.toLowerCase();
+          return { recentColors: [h, ...s.recentColors.filter((x) => x !== h)].slice(0, 8) };
+        }),
+
+      // hard reset: data fields back to defaults (onboarded → false flips the
+      // navigator guard back to onboarding); persist overwrites storage with these
+      resetAll: () => set({ ...freshData() }),
+
+      // shallow-merge the demo slice; settings/theme/accent stay as the user has them
+      loadDemo: () => set({ ...buildDemoData() }),
     }),
     {
       name: 'flint-v1',
-      version: 7,
+      version: 9,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: (persisted: any, version) => {
         if (version < 2 && persisted) {
@@ -313,8 +372,6 @@ export const useStore = create<FlintState>()(
           }
         }
         if (version < 3 && persisted?.settings) {
-          // celebration: 'juicy'/'max' collapse into the upgraded 'extra'
-          if (persisted.settings.celebrate !== 'calm') persisted.settings.celebrate = 'extra';
           if (persisted.settings.clock24 == null) persisted.settings.clock24 = false;
         }
         if (version < 4 && persisted) {
@@ -340,6 +397,16 @@ export const useStore = create<FlintState>()(
           // the default wholesale, so a missing field would read undefined)
           if (persisted.settings) persisted.settings.alarmRingtoneUri = persisted.settings.alarmRingtoneUri ?? null;
         }
+        if (version < 8 && persisted?.settings) {
+          // reduce-motion toggle (H5) is new — backfill off so it reads a real
+          // boolean (persisted.settings replaces the default wholesale)
+          persisted.settings.reduceMotion = persisted.settings.reduceMotion ?? false;
+        }
+        if (version < 9 && persisted) {
+          // Pomodoro config is new — backfill the whole object (it's persisted
+          // standalone, so a missing field would read undefined at every call site)
+          persisted.pomodoro = persisted.pomodoro ?? { ...DEFAULT_POMODORO };
+        }
         return persisted;
       },
       partialize: (s) => ({
@@ -360,6 +427,8 @@ export const useStore = create<FlintState>()(
         celebratedFirst: s.celebratedFirst,
         settings: s.settings,
         sound: s.sound,
+        pomodoro: s.pomodoro,
+        recentColors: s.recentColors,
       }),
     }
   )

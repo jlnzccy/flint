@@ -19,6 +19,7 @@ import { enableScreens } from 'react-native-screens';
 
 import { CelebrationOverlay } from '@/components/celebration';
 import { ConfirmHost } from '@/components/confirm-dialog';
+import { playCelebration } from '@/lib/sfx';
 import { ToastProvider } from '@/components/toast';
 import {
   addForegroundAlarmListener,
@@ -41,6 +42,12 @@ function Root() {
   const router = useRouter();
   const onboarded = useStore((s) => s.onboarded);
   const showCelebration = useStore((s) => s.showCelebration);
+
+  // the first-routine party plays its sting when it appears (the player celebrate
+  // phase has its own call; this covers every routine-creation path)
+  useEffect(() => {
+    if (showCelebration) playCelebration();
+  }, [showCelebration]);
 
   // notification taps: alarm routines open the full-screen alarm, others open the routine
   useEffect(() => {

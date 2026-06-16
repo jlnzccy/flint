@@ -11,14 +11,13 @@ import { NewRoutineSheet } from '@/components/new-routine-sheet';
 import { PreviewSheet, RoutineCard } from '@/components/routine-bits';
 import { BottomSheet } from '@/components/sheet';
 import { DragList } from '@/components/drag-list';
-import { TodoRow } from '@/components/todo-row';
 import { useToast } from '@/components/toast';
 import { Body, Chip, Display, Label, useTimeFmt } from '@/components/ui';
 import { Routine, routineOnDay } from '@/data/defaults';
 import { confirmDestructive } from '@/lib/confirm';
 import { addDays, dateKey, greetingNow, keyToDate, minsUntil, todayKey } from '@/lib/dates';
 import { finishHaptic, tapHaptic } from '@/lib/haptics';
-import { mergedHistory, resolveRoutines, streakOf, todoIsToday, useStore } from '@/state/store';
+import { mergedHistory, resolveRoutines, streakOf, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 
 const SWIPE = 48; // px of horizontal drag before the day flips
@@ -66,9 +65,8 @@ export default function TodayScreen() {
   const doneMap = useStore((s) => s.doneMap);
   const bumped = useStore((s) => s.bumped);
   const history = useStore((s) => s.history);
-  const todos = useStore((s) => s.todos);
   const settings = useStore((s) => s.settings);
-  const { markDone, bump, unbump, archiveRoutine, deleteRoutine, restoreRoutine, reorder } = useStore.getState();
+  const { markDone, bump, unbump, archiveRoutine, deleteRoutine, restoreRoutine, reorder, duplicateRoutine } = useStore.getState();
 
   const routines = useMemo(
     () => resolveRoutines({ custom, overrides, order, archived, deleted }),
@@ -126,7 +124,6 @@ export default function TodayScreen() {
   const scheduled = open.filter((r) => r.reminder).sort((a, b) => a.reminder!.localeCompare(b.reminder!));
   const flexible = open.filter((r) => !r.reminder);
   const completed = todayRoutines.filter((r) => doneMap[r.id]);
-  const todayTodos = todos.filter((td) => todoIsToday(td));
 
   // time-blindness anchor: the next scheduled thing still ahead of now
   const nextUp = scheduled.filter((r) => !bumped[r.id]).find((r) => minsUntil(r.reminder) > 0);
@@ -204,64 +201,48 @@ export default function TodayScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       <GestureDetector gesture={swipe}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={{ flex: 1 }}>
+        {/* pinned hero header — stays put while the day's list slides on swipe */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Pressable
+                onPressIn={() => tapHaptic()}
+                onPress={() => router.push('/calendar')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                accessibilityLabel="Open calendar"
+              >
+                <Label>{dateLabel}</Label>
+                <IconCal size={15} color={t.faint} />
+              </Pressable>
+              <Display size={30} style={{ marginTop: 8 }}>{heroTitle}</Display>
+              {isToday && nextUp ? (
+                <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Next: {nextUp.name} · {nextWhen}</Body>
+              ) : isFuture ? (
+                <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Coming up</Body>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+              {isToday && settings.streaks && <StreakBadge n={streak} />}
+              {!isToday && (
+                <Chip onPress={() => goDay(todayK)} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+                  <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.muted }}>Today</Text>
+                </Chip>
+              )}
+            </View>
+          </View>
+        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <Animated.View style={panStyle}>
           <Animated.View key={viewKey} entering={dir > 0 ? SLIDE_R : SLIDE_L}>
-            {/* day of week + date — swipe to move days, tap to open the calendar */}
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Pressable
-                  onPressIn={() => tapHaptic()}
-                  onPress={() => router.push('/calendar')}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                  accessibilityLabel="Open calendar"
-                >
-                  <Label>{dateLabel}</Label>
-                  <IconCal size={15} color={t.faint} />
-                </Pressable>
-                <Display size={30} style={{ marginTop: 8 }}>{heroTitle}</Display>
-                {isToday && nextUp ? (
-                  <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Next: {nextUp.name} · {nextWhen}</Body>
-                ) : isFuture ? (
-                  <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Coming up</Body>
-                ) : null}
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                {isToday && settings.streaks && <StreakBadge n={streak} />}
-                {!isToday && (
-                  <Chip onPress={() => goDay(todayK)} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
-                    <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.muted }}>Today</Text>
-                  </Chip>
-                )}
-              </View>
-            </View>
-
-        {/* tasks due today — today only */}
-        {isToday && todayTodos.length > 0 && (
-          <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 }}>
-              <Label color={t.muted}>Tasks</Label>
-              <Chip onPress={() => router.push('/tasks')} style={{ paddingVertical: 5, paddingHorizontal: 11 }}>
-                <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.muted }}>All</Text>
-              </Chip>
-            </View>
-            <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, paddingHorizontal: 14 }}>
-              {todayTodos.map((td, i) => (
-                <View key={td.id} style={{ borderTopWidth: i ? 2 : 0, borderColor: t.lineSoft }}>
-                  <TodoRow todo={td} />
-                </View>
-              ))}
-            </View>
-          </>
-        )}
 
         {/* routines header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 12 }}>
           <Label color={t.muted}>{routinesLabel}</Label>
           {isToday && (
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -367,6 +348,7 @@ export default function TodayScreen() {
           </Animated.View>
         </Animated.View>
       </ScrollView>
+      </View>
       </GestureDetector>
 
       {/* ⋯ menu */}
@@ -424,6 +406,11 @@ export default function TodayScreen() {
           toast('Done ✓');
         }}
         onEdit={(r) => router.push(`/editor?id=${r.id}`)}
+        onDuplicate={(r) => {
+          duplicateRoutine(r.id);
+          toast('Duplicated');
+        }}
+        onShare={() => toast('Coming soon')}
         onBump={(r) => {
           bump(r.id);
           toast('See you tomorrow');

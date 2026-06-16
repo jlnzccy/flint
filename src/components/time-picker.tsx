@@ -148,6 +148,8 @@ export function TimePicker({ value, onChange }: { value: string; onChange: (v: s
       const step = fieldSv.value === 'm' ? 6 : 30;
       angle.value = withTiming(Math.round(angle.value / step) * step, { duration: 110 });
       runOnJS(setDragging)(false);
+      // once the hour lands, hand the dial to minutes (gesture-end only, never mid-drag)
+      if (fieldSv.value === 'h') runOnJS(setField)('m');
     })
     .onFinalize(() => runOnJS(setDragging)(false));
 
@@ -275,8 +277,8 @@ export function TimePicker({ value, onChange }: { value: string; onChange: (v: s
         value={manual ? 'type' : 'dial'}
         onChange={(v) => setManual(v === 'type')}
         options={[
-          { value: 'dial', label: '🕐 Dial' },
-          { value: 'type', label: '⌨ Type' },
+          { value: 'dial', label: 'Dial' },
+          { value: 'type', label: 'Type' },
         ]}
       />
     </View>

@@ -7,6 +7,8 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { BottomSheet } from '@/components/sheet';
 import { ChunkyButton } from '@/components/chunky';
 import { Body, FlintInput, Label } from '@/components/ui';
+import { tapHaptic } from '@/lib/haptics';
+import { useStore } from '@/state/store';
 import { hexDarken, hslToHex, inkOn } from '@/theme/colors';
 import { useTheme } from '@/theme/theme';
 
@@ -109,6 +111,8 @@ interface ColorPickerProps {
 
 export function ColorPickerSheet({ open, initial, onClose, onPick }: ColorPickerProps) {
   const t = useTheme();
+  const recents = useStore((s) => s.recentColors);
+  const pushRecent = useStore((s) => s.pushRecentColor);
   const [hue, setHue] = useState(20);
   const [light, setLight] = useState(0.55);
   const [hex, setHex] = useState(initial);
@@ -148,6 +152,30 @@ export function ColorPickerSheet({ open, initial, onClose, onPick }: ColorPicker
           {hex.toUpperCase()}
         </Text>
       </View>
+
+      {recents.length > 0 && (
+        <>
+          <Label style={{ marginBottom: 8 }}>Recent</Label>
+          <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+            {recents.map((r) => (
+              <Pressable
+                key={r}
+                accessibilityLabel={`Recent ${r}`}
+                onPressIn={() => tapHaptic()}
+                onPress={() => {
+                  pushRecent(r);
+                  onPick(r);
+                  onClose();
+                }}
+                style={{
+                  width: 36, height: 36, borderRadius: 18, backgroundColor: r,
+                  borderWidth: 2, borderColor: r === hex.toLowerCase() ? t.text : t.lineSoft,
+                }}
+              />
+            ))}
+          </View>
+        </>
+      )}
 
       <Label style={{ marginBottom: 4 }}>Hue</Label>
       <Track
@@ -192,6 +220,7 @@ export function ColorPickerSheet({ open, initial, onClose, onPick }: ColorPicker
         pad={[15, 24]}
         style={{ marginTop: 16 }}
         onPress={() => {
+          pushRecent(hex);
           onPick(hex);
           onClose();
         }}

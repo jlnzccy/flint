@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { ChunkyButton } from '@/components/chunky';
+import { ChunkyButton, ChunkyCard } from '@/components/chunky';
 import { IconChevL, IconPlus } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Checkbox, Display, EmojiTile, Label } from '@/components/ui';
@@ -54,23 +54,17 @@ export function NewRoutineSheet({ open, onClose }: { open: boolean; onClose: () 
             {ROUTINE_TEMPLATES.map((tpl) => {
               const c = t.col(tpl.color);
               return (
-                <Pressable
+                <ChunkyCard
                   key={tpl.id}
-                  onPress={() => {
-                    tapHaptic();
-                    setPicked(tpl);
-                  }}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12,
-                    backgroundColor: t.raised, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
-                  }}
+                  onPress={() => setPicked(tpl)}
+                  faceStyle={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12 }}
                 >
                   <EmojiTile emoji={tpl.emoji} size={44} radius={13} soft={c.soft} border={c.main} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Display size={15}>{tpl.name}</Display>
                     <Body size={12} color={t.faint}>{tpl.steps.length} steps · {routineMin(tpl)} min</Body>
                   </View>
-                </Pressable>
+                </ChunkyCard>
               );
             })}
           </View>
@@ -80,13 +74,13 @@ export function NewRoutineSheet({ open, onClose }: { open: boolean; onClose: () 
   );
 }
 
-/* pick which suggested steps to keep before opening the editor (all on by default) */
+/* pick which suggested steps to keep before opening the editor (start empty, opt in) */
 export function StepPicker({
   template, onBack, onUse,
 }: { template: RoutineTemplate; onBack: () => void; onUse: (idxs: number[]) => void }) {
   const t = useTheme();
   const c = t.col(template.color);
-  const [sel, setSel] = useState<Set<number>>(() => new Set(template.steps.map((_, i) => i)));
+  const [sel, setSel] = useState<Set<number>>(() => new Set<number>());
 
   const toggle = (i: number) => {
     tapHaptic();
@@ -116,7 +110,7 @@ export function StepPicker({
         <EmojiTile emoji={template.emoji} size={44} radius={13} soft={c.soft} border={c.main} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Display size={16}>{template.name}</Display>
-          <Body size={12} color={t.faint}>Tap to drop any you don't want.</Body>
+          <Body size={12} color={t.faint}>Tap the ones you want.</Body>
         </View>
       </View>
 

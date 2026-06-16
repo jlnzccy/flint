@@ -2,15 +2,15 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeIn, SlideInDown, ZoomIn } from 'react-native-reanimated';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, FadeIn, SlideInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
-import { CelebrationEmoji } from '@/components/celebration';
+import { CelebrationEmoji, Confetti } from '@/components/celebration';
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
 import {
-  IconCheck, IconClock, IconPause, IconPencil, IconPlay, IconRestart, IconSkip, IconX,
+  IconCheck, IconChevL, IconClock, IconPause, IconPencil, IconPlay, IconRestart, IconSkip, IconX,
 } from '@/components/icons';
 import { StepRow } from '@/components/routine-bits';
 import { BottomSheet } from '@/components/sheet';
@@ -18,9 +18,10 @@ import { TimerRing } from '@/components/timer-ring';
 import { useToast } from '@/components/toast';
 import { Body, Chip, Display, FlintInput, Label } from '@/components/ui';
 import { fmtSec } from '@/lib/dates';
-import { doneHaptic, finishHaptic, tapHaptic } from '@/lib/haptics';
+import { doneHaptic, finishHaptic, tapHaptic, warnHaptic } from '@/lib/haptics';
 import { cancelTimerAlert, scheduleTimerAlert } from '@/lib/notifications';
-import { playCelebration } from '@/lib/sfx';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { playCelebration, playStepDone } from '@/lib/sfx';
 import { resolveRoutines, useStore } from '@/state/store';
 import { routineOnDay } from '@/data/defaults';
 import { useTheme } from '@/theme/theme';
@@ -55,6 +56,25 @@ const HEADLINES = [
 ];
 
 const pickHeadline = () => HEADLINES[Math.floor(Math.random() * HEADLINES.length)];
+
+/* Progress segment — animates its width + color as the step changes (M1). Honors
+   reduce-motion: when calmed, the change snaps (duration 0). */
+function ProgressSeg({ width, color, bordered }: { width: number; color: string; bordered: boolean }) {
+  const t = useTheme();
+  const reduce = useReducedMotion();
+  const anim = useAnimatedStyle(() => {
+    const d = reduce ? 0 : 220;
+    return {
+      width: withTiming(width, { duration: d }),
+      backgroundColor: withTiming(color, { duration: d }),
+    };
+  });
+  return (
+    <Animated.View
+      style={[{ height: 9, borderRadius: 99, borderWidth: bordered ? 2 : 0, borderColor: t.lineSoft }, anim]}
+    />
+  );
+}
 
 function KeepAwake() {
   useKeepAwake();
@@ -112,9 +132,16 @@ export default function Player() {
     elapsedRef.current = elapsed;
   }, [elapsed]);
 
-  // soft buzz the moment the set duration is reached, whether counting up or down
+  // tick-driven cues. 30s-left nudge (E5, opt-in) on long-enough steps; then at the
+  // set duration either auto-advance (E4, opt-in — its own doneHaptic fires) or just a
+  // soft buzz. Works the same counting up or down (elapsed always counts up internally).
   useEffect(() => {
-    if (phase === 'play' && !paused && step && elapsed > 0 && elapsed === target) doneHaptic();
+    if (phase !== 'play' || paused || !step || elapsed <= 0) return;
+    if (routine?.warn30 && target > 30 && elapsed === target - 30) warnHaptic();
+    if (elapsed === target) {
+      if (routine?.autoAdvance) advance('done');
+      else doneHaptic();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsed]);
 
@@ -149,11 +176,28 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, phase]);
 
-  // celebration sound — one random sting when the routine completes (extra mode)
+  // celebration sound — one random sting when the routine completes
   useEffect(() => {
-    if (phase === 'celebrate' && settings.celebrate === 'extra') playCelebration();
+    if (phase === 'celebrate') playCelebration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // step-complete check (E2): a check pops in the ring center on Done, then fades as
+  // the next step's timer appears. Honors reduce-motion — calmed = no pop.
+  const reduce = useReducedMotion();
+  const checkSv = useSharedValue(0);
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: checkSv.value,
+    transform: [{ scale: 0.55 + checkSv.value * 0.45 }],
+  }));
+  const popCheck = () => {
+    if (reduce) return;
+    checkSv.value = withSequence(
+      withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: 220 }),
+      withTiming(0, { duration: 320, easing: Easing.in(Easing.cubic) })
+    );
+  };
 
   if (!routine || !step) {
     return null;
@@ -183,11 +227,28 @@ export default function Player() {
       setStats(finalStats);
       setPhase('celebrate');
     } else {
+      if (result === 'done') {
+        popCheck();
+        playStepDone();
+      }
       setIdx((i) => i + 1);
       setElapsed(0);
       setExtra(0);
       setPaused(false);
     }
+  };
+
+  // step back one (E3) — reverse an accidental Done/Skip. Clears the returned-to
+  // step's result so it can be redone (no double-count) and restarts its timer.
+  const goBack = () => {
+    if (idx === 0) return;
+    const prev = idx - 1;
+    (results.current as (StepResult | undefined)[])[prev] = undefined;
+    tapHaptic();
+    setIdx(prev);
+    setElapsed(0);
+    setExtra(0);
+    setPaused(false);
   };
 
   /* ── celebration ── */
@@ -200,21 +261,18 @@ export default function Player() {
     const allDone = todayRoutines.length > 0 && doneToday === todayRoutines.length;
     return (
       <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
+        <Confetti color={c.main} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 20 }}
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeIn.duration(350)} style={{ alignItems: 'center', justifyContent: 'center' }}>
-            {settings.celebrate === 'calm' ? (
-              <Text style={{ fontSize: 78, textAlign: 'center' }}>🔥</Text>
-            ) : (
-              <View style={{ width: 210, height: 210, alignItems: 'center', justifyContent: 'center' }}>
-                <Animated.View entering={ZoomIn.springify().damping(11).stiffness(150).mass(0.7)}>
-                  <CelebrationEmoji size={150} />
-                </Animated.View>
-              </View>
-            )}
+            <View style={{ width: 210, height: 210, alignItems: 'center', justifyContent: 'center' }}>
+              <Animated.View entering={ZoomIn.springify().damping(11).stiffness(150).mass(0.7)}>
+                <CelebrationEmoji size={150} />
+              </Animated.View>
+            </View>
           </Animated.View>
           <Animated.View entering={SlideInDown.duration(300).delay(80)}>
             <Display size={31} style={{ textAlign: 'center', marginTop: 12, marginBottom: 8 }}>{headline}</Display>
@@ -304,13 +362,11 @@ export default function Player() {
         style={{ flexDirection: 'row', gap: 6, justifyContent: 'center', paddingTop: 8, paddingBottom: 2 }}
       >
         {steps.map((_, i) => (
-          <View
+          <ProgressSeg
             key={i}
-            style={{
-              width: i === idx ? 30 : 9, height: 9, borderRadius: 99,
-              backgroundColor: i < idx ? (results.current[i] === 'done' ? c.main : t.line) : i === idx ? c.main : t.raised,
-              borderWidth: i > idx ? 2 : 0, borderColor: t.lineSoft,
-            }}
+            width={i === idx ? 30 : 9}
+            color={i < idx ? (results.current[i] === 'done' ? c.main : t.line) : i === idx ? c.main : t.raised}
+            bordered={i > idx}
           />
         ))}
       </Pressable>
@@ -334,6 +390,15 @@ export default function Player() {
               <Body size={12} color={t.faint}>past target — still counts</Body>
             ) : null}
           </TimerRing>
+          {/* step-complete check (E2) — pops over the ring, fades to reveal the next timer */}
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }, checkStyle]}
+          >
+            <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: t.green.main, alignItems: 'center', justifyContent: 'center' }}>
+              <IconCheck size={50} color={t.green.ink} />
+            </View>
+          </Animated.View>
         </View>
 
         {/* how long this step is set for */}
@@ -393,9 +458,26 @@ export default function Player() {
 
       {/* bottom controls */}
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: insets.bottom + 18 }}>
-        <Body size={14} color={t.faint} numberOfLines={1} style={{ textAlign: 'center', marginBottom: 12 }}>
-          {idx + 1 < steps.length ? `Next: ${steps[idx + 1].t}` : 'Last step — downhill from here'}
-        </Body>
+        {/* secondary row: previous-step (E3, left) + next-step hint (E1, centered) */}
+        <View style={{ justifyContent: 'center', minHeight: 22, marginBottom: 12 }}>
+          {idx > 0 && (
+            <Pressable
+              onPressIn={() => tapHaptic()}
+              onPress={goBack}
+              hitSlop={8}
+              accessibilityLabel="Previous step"
+              style={{ position: 'absolute', left: 0, top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 2 }}
+            >
+              <IconChevL size={15} color={t.faint} />
+              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.faint, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                Back
+              </Text>
+            </Pressable>
+          )}
+          <Body size={13} color={t.faint} numberOfLines={1} style={{ textAlign: 'center', paddingHorizontal: 64 }}>
+            {idx + 1 < steps.length ? `Next step: ${idx + 2}. ${steps[idx + 1].t}` : 'Last step — downhill from here'}
+          </Body>
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <CircleBtn onPress={() => setPaused((p) => !p)} label={paused ? 'Resume' : 'Pause'}>
             {paused ? <IconPlay color={t.text} /> : <IconPause color={t.text} />}

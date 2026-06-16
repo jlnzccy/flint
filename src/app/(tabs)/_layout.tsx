@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { IconChart, IconGear, IconHome, IconList, IconWaves } from '@/components/icons';
+import { ChunkyButton } from '@/components/chunky';
+import { IconChart, IconGear, IconHome, IconList, IconPlus } from '@/components/icons';
+import { NewRoutineSheet } from '@/components/new-routine-sheet';
 import { tapHaptic } from '@/lib/haptics';
 import { useTheme } from '@/theme/theme';
 
@@ -11,71 +13,98 @@ const TABS = [
   { name: 'index', label: 'Routine', Icon: IconHome },
   { name: 'tasks', label: 'Tasks', Icon: IconList },
   { name: 'insights', label: 'Insights', Icon: IconChart },
-  { name: 'sounds', label: 'Sounds', Icon: IconWaves },
   { name: 'settings', label: 'Settings', Icon: IconGear },
 ];
 
-function TabBar({ state, navigation }: any) {
+function TabBar({ state, navigation, onAdd }: any) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+
+  const tabs = state.routes
+    .map((route: any, i: number) => {
+      const def = TABS.find((x) => x.name === route.name);
+      if (!def) return null; // sounds is a pushed route now — not in the bar
+      const active = state.index === i;
+      return (
+        <Pressable
+          key={route.key}
+          accessibilityRole="tab"
+          accessibilityLabel={def.label}
+          accessibilityState={{ selected: active }}
+          onPress={() => {
+            tapHaptic();
+            if (!active) navigation.navigate(route.name);
+          }}
+          style={{ flex: 1, alignItems: 'center', paddingTop: 12, paddingBottom: 14 }}
+        >
+          {/* icon-only — the active tab gets a rounded accent pill behind it */}
+          <View
+            style={{
+              paddingVertical: 7,
+              paddingHorizontal: 18,
+              borderRadius: 13,
+              backgroundColor: active ? t.accent.soft : 'transparent',
+            }}
+          >
+            <def.Icon size={24} color={active ? t.accent.main : t.faint} />
+          </View>
+        </Pressable>
+      );
+    })
+    .filter(Boolean);
+
+  // prominent center "+" splits the row: Routine · Tasks · [ + ] · Insights · Settings
+  const mid = Math.ceil(tabs.length / 2);
+  const addBtn = (
+    <View key="add" style={{ width: 64, alignItems: 'center' }}>
+      <ChunkyButton
+        color={t.accent.main}
+        deep={t.accent.deep}
+        ink={t.accent.ink}
+        onPress={onAdd}
+        accessibilityLabel="New routine"
+        pad={[0, 0]}
+        radius={27}
+        style={{ width: 54, marginTop: -20 }}
+        faceStyle={{ width: 54, height: 54, borderRadius: 27 }}
+      >
+        <IconPlus size={26} color={t.accent.ink} />
+      </ChunkyButton>
+    </View>
+  );
+
   return (
     <View
       style={{
         flexDirection: 'row',
+        alignItems: 'flex-start',
         borderTopWidth: 2,
         borderColor: t.lineSoft,
         backgroundColor: t.surface,
         paddingBottom: insets.bottom,
       }}
     >
-      {state.routes.map((route: any, i: number) => {
-        const def = TABS.find((x) => x.name === route.name);
-        if (!def) return null;
-        const active = state.index === i;
-        const color = active ? t.accent.main : t.faint;
-        return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            onPress={() => {
-              tapHaptic();
-              if (!active) navigation.navigate(route.name);
-            }}
-            style={{ flex: 1, alignItems: 'center', gap: 3, paddingTop: 10, paddingBottom: 12 }}
-          >
-            <def.Icon color={color} />
-            <Text
-              style={{
-                fontFamily: 'Nunito_800ExtraBold',
-                fontSize: 11,
-                letterSpacing: 0.66,
-                textTransform: 'uppercase',
-                color,
-              }}
-            >
-              {def.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {[...tabs.slice(0, mid), addBtn, ...tabs.slice(mid)]}
     </View>
   );
 }
 
 export default function TabsLayout() {
   const t = useTheme();
+  const [newOpen, setNewOpen] = useState(false);
   return (
-    <Tabs
-      tabBar={(props) => <TabBar {...props} />}
-      // tabs are top-level destinations — switch instantly, no cross-fade
-      screenOptions={{ headerShown: false, animation: 'none', sceneStyle: { backgroundColor: t.bg } }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="tasks" />
-      <Tabs.Screen name="insights" />
-      <Tabs.Screen name="sounds" />
-      <Tabs.Screen name="settings" />
-    </Tabs>
+    <>
+      <Tabs
+        tabBar={(props) => <TabBar {...props} onAdd={() => setNewOpen(true)} />}
+        // tabs cross-fade between destinations — buttery, not a hard snap
+        screenOptions={{ headerShown: false, animation: 'fade', sceneStyle: { backgroundColor: t.bg } }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="tasks" />
+        <Tabs.Screen name="insights" />
+        <Tabs.Screen name="settings" />
+      </Tabs>
+      <NewRoutineSheet open={newOpen} onClose={() => setNewOpen(false)} />
+    </>
   );
 }

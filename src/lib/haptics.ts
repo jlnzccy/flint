@@ -30,6 +30,14 @@ export function doneHaptic() {
   else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {});
 }
 
+/* warn = the 30-seconds-left nudge (per-routine, opt-in). A clock-tick on Android
+   and a Light tap on iOS — distinct from `done`'s softer target buzz, never alarming. */
+export function warnHaptic() {
+  if (!on()) return;
+  if (android) Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Clock_Tick).catch(() => {});
+  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
+
 export function finishHaptic() {
   if (!on()) return;
   if (android) Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm).catch(() => {});

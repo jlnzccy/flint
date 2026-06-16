@@ -1,6 +1,7 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as IntentLauncher from 'expo-intent-launcher';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BackHandler, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
@@ -72,6 +73,7 @@ export default function Editor() {
     routine ? routine.reminder ?? null : tpl ? tpl.reminder ?? null : '07:00'
   );
   const [alarm, setAlarm] = useState(!!seed?.alarm);
+  const [alarmUri, setAlarmUri] = useState<string | null>(routine?.alarmRingtoneUri ?? null);
   const [days, setDays] = useState<number[]>(routine?.days?.length ? routine.days : [0, 1, 2, 3, 4, 5, 6]);
   // which step's edit sheet is open (its _k), or null
   const [editKey, setEditKey] = useState<string | null>(null);
@@ -113,6 +115,66 @@ export default function Editor() {
 
   const valid = name.trim().length > 0 && steps.some((s) => s.t.trim());
 
+  // unsaved-changes guard (B4): serialize the editable fields, compare to the
+  // baseline captured on first render. A quiet "Discard?" confirm — never a nag.
+  const snapshot = () =>
+    JSON.stringify({
+      name: name.trim(),
+      emoji,
+      color,
+      reminder,
+      alarm,
+      alarmUri,
+      days: [...days].sort(),
+      steps: steps.map((s) => ({ t: s.t.trim(), min: s.min, hint: s.hint.trim() })),
+    });
+  const baseline = useRef<string | null>(null);
+  if (baseline.current === null) baseline.current = snapshot();
+  const dirty = baseline.current !== snapshot();
+
+  // Close button + Android hardware back route through here; intentional exits
+  // (save/archive/delete) call the router directly and skip the guard.
+  const leave = () => {
+    if (dirty) confirmDestructive('Discard changes?', "Your edits won't be saved.", 'Discard', () => router.back());
+    else router.back();
+  };
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (!dirty) return false;
+        leave();
+        return true;
+      });
+      return () => sub.remove();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dirty])
+  );
+
+  // Android ringtone picker → per-routine alarm URI (iOS has no public API)
+  const pickRingtone = async () => {
+    if (Platform.OS !== 'android') {
+      toast('Android only');
+      return;
+    }
+    try {
+      const res = await IntentLauncher.startActivityAsync('android.intent.action.RINGTONE_PICKER', {
+        extra: {
+          'android.intent.extra.ringtone.TYPE': 4, // TYPE_ALARM
+          'android.intent.extra.ringtone.SHOW_DEFAULT': true,
+          'android.intent.extra.ringtone.SHOW_SILENT': false,
+          'android.intent.extra.ringtone.TITLE': 'Alarm sound',
+        },
+      });
+      const picked = (res.extra as Record<string, any> | undefined)?.['android.intent.extra.ringtone.PICKED_URI'] ?? res.data;
+      if (res.resultCode === IntentLauncher.ResultCode.Success && picked) {
+        setAlarmUri(String(picked));
+        toast('Alarm sound set');
+      }
+    } catch {
+      toast("Couldn't open picker");
+    }
+  };
+
   const save = () => {
     const r: Routine = {
       id: routine ? routine.id : 'c' + Date.now(),
@@ -123,6 +185,7 @@ export default function Editor() {
       alarm: reminder ? alarm : false,
       days: days.length === 7 ? undefined : [...days].sort(),
       steps: steps.filter((s) => s.t.trim()).map((s) => ({ t: s.t.trim(), min: s.min, hint: s.hint.trim() || undefined })),
+      alarmRingtoneUri: reminder && alarm ? alarmUri : null,
     };
     const st = useStore.getState();
     const firstEver = !editing && !st.celebratedFirst;
@@ -143,7 +206,7 @@ export default function Editor() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
-        <CircleBtn size={44} onPress={() => router.back()} label="Close">
+        <CircleBtn size={44} onPress={leave} label="Close">
           <IconX color={t.text} />
         </CircleBtn>
         <Display size={18}>{editing ? 'Edit routine' : 'New routine'}</Display>
@@ -222,30 +285,22 @@ export default function Editor() {
               }}
             />
           ))}
-          {/* a chosen custom color shows as its own selected swatch… */}
-          {customColor && (
-            <Pressable
-              accessibilityLabel="Custom color"
-              onPressIn={() => tapHaptic()}
-              onPress={() => setColorOpen(true)}
-              style={{
-                width: 40, height: 40, borderRadius: 20, backgroundColor: c.main,
-                borderWidth: 3, borderColor: t.text, transform: [{ scale: 1.12 }],
-              }}
-            />
-          )}
-          {/* …and the picker button is always here, so it never disappears */}
+          {/* one fixed trailing slot: shows the chosen custom color (re-opens picker) or "+".
+              recoloring in place means picking a custom color never reflows the row */}
           <Pressable
             accessibilityLabel={customColor ? 'Edit custom color' : 'Custom color'}
             onPressIn={() => tapHaptic()}
             onPress={() => setColorOpen(true)}
             style={{
               width: 40, height: 40, borderRadius: 20,
-              backgroundColor: t.raised, borderWidth: 2, borderColor: t.line,
+              backgroundColor: customColor ? c.main : t.raised,
+              borderWidth: customColor ? 3 : 2,
+              borderColor: customColor ? t.text : t.line,
               alignItems: 'center', justifyContent: 'center',
+              transform: [{ scale: customColor ? 1.12 : 1 }],
             }}
           >
-            <IconPlus size={16} color={t.muted} />
+            {customColor ? null : <IconPlus size={16} color={t.muted} />}
           </Pressable>
         </View>
 
@@ -254,14 +309,12 @@ export default function Editor() {
           value={reminder ? 'timed' : 'anytime'}
           onChange={(v) => {
             if (v === 'anytime') setReminder(null);
-            else {
-              setDraftTime(reminder || '07:00');
-              setTimeOpen(true);
-            }
+            // reveal the time row; user taps "Change" to open the dial (no auto-open)
+            else setReminder(draftTime || '07:00');
           }}
           options={[
-            { value: 'anytime', label: '⚡ Anytime' },
-            { value: 'timed', label: '🔔 At a time' },
+            { value: 'anytime', label: 'Anytime' },
+            { value: 'timed', label: 'At a time' },
           ]}
         />
         {reminder ? (
@@ -296,6 +349,43 @@ export default function Editor() {
               </View>
               <Toggle on={alarm} onChange={setAlarm} />
             </View>
+            {alarm ? (
+              <>
+                <Pressable
+                  onPress={pickRingtone}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, marginTop: 8,
+                    backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Display size={15}>Alarm sound</Display>
+                    <Body size={12} color={t.faint} style={{ marginTop: 2 }}>
+                      {alarmUri ? 'Custom ringtone' : 'Marimba (default)'}
+                    </Body>
+                  </View>
+                  <IconChevR size={18} color={t.faint} />
+                </Pressable>
+                {alarmUri ? (
+                  <Pressable
+                    onPress={() => {
+                      setAlarmUri(null);
+                      toast('Back to default');
+                    }}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, marginTop: 8,
+                      backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Display size={15}>Use app default</Display>
+                      <Body size={12} color={t.faint} style={{ marginTop: 2 }}>Bundled marimba</Body>
+                    </View>
+                    <IconRestart size={16} color={t.faint} />
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
           </>
         ) : null}
 
@@ -323,12 +413,6 @@ export default function Editor() {
             );
           })}
         </View>
-        {days.length < 7 && (
-          <Body size={12} color={t.faint} style={{ marginTop: 6 }}>
-            Only shows on these days.
-          </Body>
-        )}
-
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 8 }}>
           <Label>Steps</Label>
           <Body size={12} color={t.faint}>Tap to set time</Body>

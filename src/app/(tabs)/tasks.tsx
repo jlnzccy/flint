@@ -90,15 +90,16 @@ export default function Tasks() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
+        <Display size={30}>Tasks</Display>
+      </View>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 28 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Display size={30}>Tasks</Display>
-
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           <FlintInput
             style={{ flex: 1, paddingVertical: 9, paddingHorizontal: 13, fontSize: 15 }}
             placeholder='Quick add — "Meds @ 9am"'

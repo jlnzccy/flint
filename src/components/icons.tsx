@@ -211,6 +211,17 @@ export const IconDrag = ({ size = 20, color }: IconProps) => (
   </Svg>
 );
 
+export const IconShare = ({ size = 18, color }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 20 20">
+    <G stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx={15} cy={4.5} r={2.2} />
+      <Circle cx={5} cy={10} r={2.2} />
+      <Circle cx={15} cy={15.5} r={2.2} />
+      <Path d="M6.9 8.9l6.2-3.3M6.9 11.1l6.2 3.3" />
+    </G>
+  </Svg>
+);
+
 /* sound waves radiating from a source — the Sounds tab */
 export const IconWaves = ({ size = 22, color }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 22 22">

@@ -108,11 +108,11 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) =
 
 /* ── Segmented ── */
 export function Segmented<T extends string>({
-  options, value, onChange,
-}: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  options, value, onChange, small,
+}: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; small?: boolean }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: 4, padding: 4, backgroundColor: t.raised, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 14 }}>
+    <View style={{ flexDirection: 'row', gap: 4, padding: small ? 3 : 4, backgroundColor: t.raised, borderWidth: 2, borderColor: t.lineSoft, borderRadius: small ? 12 : 14 }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -121,11 +121,11 @@ export function Segmented<T extends string>({
             onPressIn={() => tapHaptic()}
             onPress={() => onChange(o.value)}
             style={{
-              flex: 1, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 4,
+              flex: 1, borderRadius: small ? 9 : 10, paddingVertical: small ? 5 : 8, paddingHorizontal: 4,
               backgroundColor: active ? t.accent.main : 'transparent', alignItems: 'center',
             }}
           >
-            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: active ? t.accent.ink : t.muted }}>{o.label}</Text>
+            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: small ? 12 : 13, color: active ? t.accent.ink : t.muted }}>{o.label}</Text>
           </Pressable>
         );
       })}

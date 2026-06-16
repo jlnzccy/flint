@@ -15,6 +15,9 @@ export interface Routine {
   alarm?: boolean;
   days?: number[]; // 0=Sun … 6=Sat; absent = every day
   steps: Step[];
+  autoAdvance?: boolean; // at a step's 0, move to the next step automatically (player E4)
+  warn30?: boolean; // cue when 30s remain on a step (player E5)
+  alarmRingtoneUri?: string | null; // per-routine alarm sound; null/absent = bundled marimba
   builtin?: boolean;
 }
 

@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   cancelAnimation,
@@ -11,11 +12,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ChunkyButton } from '@/components/chunky';
-import { IconPause, IconPlay } from '@/components/icons';
+import { ChunkyButton, CircleBtn } from '@/components/chunky';
+import { IconPause, IconPlay, IconX } from '@/components/icons';
 import { Slider } from '@/components/slider';
 import { Body, Chip, Display, Label, Segmented } from '@/components/ui';
-import { tapHaptic } from '@/lib/haptics';
 import { ISO_BAND_HZ, startTone, stopTone, updateTone } from '@/lib/tones';
 import { EASE_OUT } from '@/theme/motion';
 import { useStore } from '@/state/store';
@@ -126,6 +126,7 @@ function Stat({ label, value, unit, color }: { label: string; value: string; uni
 
 export default function Sounds() {
   const t = useTheme();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const sound = useStore((s) => s.sound);
   const playing = useStore((s) => s.soundPlaying);
@@ -180,7 +181,12 @@ export default function Sounds() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36 }} showsVerticalScrollIndicator={false}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 }}>
+        <CircleBtn size={44} onPress={() => router.back()} label="Close">
+          <IconX color={t.text} />
+        </CircleBtn>
+      </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 36 }} showsVerticalScrollIndicator={false}>
         <Display size={30}>Sounds</Display>
         <Body size={14} color={t.faint} style={{ marginTop: 4 }}>
           Brainwave tones to settle in or lock on.

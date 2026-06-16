@@ -6,11 +6,8 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
 const ALARM_DEFAULT = require('../../assets/sounds/alarm-marimba.mp3');
-const CELEBRATIONS = [
-  require('../../assets/sounds/celebration-grand.mp3'),
-  require('../../assets/sounds/celebration-mini.mp3'),
-  require('../../assets/sounds/celebration-fanfare.mp3'),
-];
+const CELEBRATIONS = [require('../../assets/sounds/celebration-fanfare.mp3')];
+const STEP_DONE = require('../../assets/sounds/step-done.mp3');
 
 let modeReady = false;
 function ensureMode() {
@@ -51,13 +48,12 @@ export function stopAlarm(): void {
   } catch {}
 }
 
-/* One random celebration sting, released when it finishes playing. */
-export function playCelebration(): void {
+/* Fire-and-forget one-shot: play src once, release the player when it finishes. */
+function playOneShot(src: number, volume = 1): void {
   ensureMode();
   try {
-    const src = CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)];
     const player = createAudioPlayer(src);
-    player.volume = 1;
+    player.volume = volume;
     const sub = player.addListener('playbackStatusUpdate', (status) => {
       if (status.didJustFinish) {
         sub.remove();
@@ -68,4 +64,15 @@ export function playCelebration(): void {
     });
     player.play();
   } catch {}
+}
+
+/* One random celebration sting, released when it finishes playing. */
+export function playCelebration(): void {
+  playOneShot(CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]);
+}
+
+/* Soft tick when a routine step is marked done (the final step plays the
+   celebration sting instead). Quieter than the celebration so it stays gentle. */
+export function playStepDone(): void {
+  playOneShot(STEP_DONE, 0.8);
 }
