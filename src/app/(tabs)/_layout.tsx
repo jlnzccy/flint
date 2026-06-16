@@ -35,7 +35,7 @@ function TabBar({ state, navigation, onAdd }: any) {
             tapHaptic();
             if (!active) navigation.navigate(route.name);
           }}
-          style={{ flex: 1, alignItems: 'center', paddingTop: 12, paddingBottom: 14 }}
+          style={{ flex: 1, alignItems: 'center', paddingTop: 16, paddingBottom: 18 }}
         >
           {/* icon-only — active tab = rounded square, 2px accent outline + soft fill.
              inactive keeps a transparent 2px border so the icon never shifts. */}
@@ -56,7 +56,8 @@ function TabBar({ state, navigation, onAdd }: any) {
     })
     .filter(Boolean);
 
-  // prominent center "+" splits the row: Routine · Tasks · [ + ] · Insights · Settings
+  // prominent center "+" splits the row: Routine · Tasks · [ + ] · Insights · Settings.
+  // sits flush inside the bar (no negative margin) — the row centers it against the icons.
   const mid = Math.ceil(tabs.length / 2);
   const addBtn = (
     <View key="add" style={{ width: 64, alignItems: 'center' }}>
@@ -68,8 +69,8 @@ function TabBar({ state, navigation, onAdd }: any) {
         accessibilityLabel="New routine"
         pad={[0, 0]}
         radius={16}
-        style={{ width: 56, marginTop: -16 }}
-        faceStyle={{ width: 56, height: 40, borderRadius: 16 }}
+        style={{ width: 56 }}
+        faceStyle={{ width: 56, height: 46, borderRadius: 16 }}
       >
         <IconPlus size={26} color={t.accent.ink} />
       </ChunkyButton>
@@ -80,7 +81,7 @@ function TabBar({ state, navigation, onAdd }: any) {
     <View
       style={{
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         borderTopWidth: 2,
         borderColor: t.lineSoft,
         backgroundColor: t.surface,
