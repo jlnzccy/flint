@@ -242,27 +242,28 @@ export default function Player() {
     }
   };
 
-  // step back one (E3) — reverse an accidental Done/Skip. Clears the returned-to
-  // step's result so it can be redone (no double-count) and restarts its timer.
+  // step back one (E3) — revisit a finished step. Its result is kept (so the primary
+  // button reads "Do it again", QoL1) but the timer restarts; redoing it just re-records
+  // the same result, so there's no double-count.
   const goBack = () => {
     if (idx === 0) return;
-    const prev = idx - 1;
-    (results.current as (StepResult | undefined)[])[prev] = undefined;
     tapHaptic();
-    setIdx(prev);
+    setIdx(idx - 1);
     setElapsed(0);
     setExtra(0);
     setPaused(false);
   };
 
-  // swipe right over the player body → previous step (T2). Horizontal-only (fails on
-  // vertical) so it doesn't fight the paused "Still to go" list or button taps; goBack
-  // already taps a haptic + no-ops at step 1, and the celebrate phase never mounts this.
-  const swipeBack = Gesture.Pan()
-    .activeOffsetX(24)
+  // horizontal swipes over the player body (T2 + QoL1): swipe right → previous step,
+  // swipe left → skip (mirrors the Skip button, drama-free). Horizontal-only (fails on
+  // vertical) so it doesn't fight scroll or button taps; goBack/advance handle their own
+  // haptics + edge cases, and the celebrate phase never mounts this.
+  const swipeNav = Gesture.Pan()
+    .activeOffsetX([-24, 24])
     .failOffsetY([-18, 18])
     .onEnd((e) => {
       if (e.translationX > 56 && idx > 0) runOnJS(goBack)();
+      else if (e.translationX < -56) runOnJS(advance)('skipped');
     });
 
   /* ── celebration ── */
@@ -347,6 +348,8 @@ export default function Player() {
   const ringProgress = settings.countUp ? elapsed / target : 1 - elapsed / target;
   const shownTime = settings.countUp ? elapsed : Math.max(0, target - elapsed);
   const remaining = steps.slice(idx + 1);
+  // revisiting a step already finished this session → the primary reads "Do it again" (QoL1)
+  const redo = results.current[idx] === 'done';
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
@@ -392,8 +395,8 @@ export default function Player() {
         ))}
       </Pressable>
 
-      {/* main area — swipe right here = previous step (T2) */}
-      <GestureDetector gesture={swipeBack}>
+      {/* main area — swipe right = previous step, swipe left = skip (T2 + QoL1) */}
+      <GestureDetector gesture={swipeNav}>
       <View key={idx} style={{ flex: 1, alignItems: 'center', paddingHorizontal: 24 }}>
         {/* fixed-height prompt so the ring + controls never shift between steps */}
         <Animated.View entering={FadeIn.duration(250)} style={{ height: 124, justifyContent: 'center', alignItems: 'center', marginTop: 6 }}>
@@ -500,9 +503,9 @@ export default function Player() {
             style={{ flex: 1 }}
             onPress={() => advance('done')}
           >
-            <IconCheck size={18} color={c.ink} />
+            {redo ? <IconRestart size={18} color={c.ink} /> : <IconCheck size={18} color={c.ink} />}
             <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 18, color: c.ink, textTransform: 'uppercase', letterSpacing: 0.9 }}>
-              Done
+              {redo ? 'Do it again' : 'Done'}
             </Text>
           </ChunkyButton>
           <CircleBtn onPress={() => advance('skipped')} label="Skip step">
