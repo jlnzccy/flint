@@ -18,32 +18,35 @@ import { enterFade, popIn, slideUp } from '@/theme/motion';
 import { useTheme } from '@/theme/theme';
 
 type Piece = {
-  x: number; // start column (px from left)
+  ox: number; // launch origin x (px from left)
+  oy: number; // launch origin y (px from top — near the bottom edge)
+  vx: number; // total horizontal travel over the shot (signed; outward from the corner)
+  vyUp: number; // initial upward impulse (px)
+  g: number; // gravity pull (px) — arcs the piece back down past the bottom
   w: number;
   h: number;
   color: string;
   delay: number;
   dur: number;
-  drift: number; // horizontal sway amplitude
-  sway: number; // number of sway half-cycles over the fall
   spin: number; // total rotation in degrees
 };
 
-function ConfettiPiece({ piece, fallH }: { piece: Piece; fallH: number }) {
+function ConfettiPiece({ piece }: { piece: Piece }) {
   const p = useSharedValue(0);
   useEffect(() => {
-    p.value = withDelay(piece.delay, withTiming(1, { duration: piece.dur, easing: Easing.linear }));
+    p.value = withDelay(piece.delay, withTiming(1, { duration: piece.dur, easing: Easing.out(Easing.quad) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const st = useAnimatedStyle(() => {
-    const ty = -30 + p.value * fallH;
-    const tx = Math.sin(p.value * Math.PI * piece.sway) * piece.drift;
+    // ballistic arc: straight horizontal spread, vertical = up impulse then gravity
+    const tx = piece.ox + piece.vx * p.value;
+    const ty = piece.oy - piece.vyUp * p.value + piece.g * p.value * p.value;
     const opacity = p.value < 0.82 ? 1 : Math.max(0, 1 - (p.value - 0.82) / 0.18);
     return {
       opacity,
       transform: [
-        { translateX: piece.x + tx },
+        { translateX: tx },
         { translateY: ty },
         { rotate: `${p.value * piece.spin}deg` },
       ],
@@ -60,39 +63,48 @@ function ConfettiPiece({ piece, fallH }: { piece: Piece; fallH: number }) {
   );
 }
 
-/* One-shot confetti burst that fills its parent and rains colored chips down past
-   the bottom edge, then releases (no loop). Tinted from the palette plus the passed
-   routine color. Honors reduce-motion — renders nothing when calmed. */
-export function Confetti({ color, count = 32 }: { color?: string; count?: number }) {
+/* One-shot confetti *cannon*: pieces launch from the two lower corners with an angle
+   + speed, arc outward sideways, then fall under gravity past the bottom edge, then
+   release (no loop). Tinted from the palette plus the passed routine color. Honors
+   reduce-motion — renders nothing when calmed. */
+export function Confetti({ color, count = 70 }: { color?: string; count?: number }) {
   const t = useTheme();
   const reduce = useReducedMotion();
   const { width, height } = useWindowDimensions();
-  const fallH = height + 80;
 
   const pieces = useMemo<Piece[]>(() => {
     const palette = [color, t.accent.main, t.gold.main, t.teal.main, t.purple.main, t.green.main, t.rose.main].filter(
       Boolean
     ) as string[];
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
-    return Array.from({ length: count }, () => ({
-      x: rand(0, width),
-      w: rand(6, 11),
-      h: rand(9, 16),
-      color: palette[Math.floor(Math.random() * palette.length)],
-      delay: rand(0, 450),
-      dur: rand(1500, 2300),
-      drift: rand(18, 60),
-      sway: rand(2, 4),
-      spin: rand(180, 720) * (Math.random() < 0.5 ? -1 : 1),
-    }));
+    return Array.from({ length: count }, (_, i) => {
+      const left = i % 2 === 0; // alternate corners → balanced left/right spray
+      const dir = left ? 1 : -1; // left corner sprays right, right corner sprays left
+      const ox = left ? rand(0, width * 0.1) : width - rand(0, width * 0.1);
+      const oy = height - rand(20, 80); // just above the bottom edge
+      const speed = rand(0.42, 0.95) * width; // horizontal reach across the screen
+      return {
+        ox,
+        oy,
+        vx: dir * speed,
+        vyUp: rand(1.25, 1.85) * height, // strong up impulse → real arc
+        g: rand(1.75, 2.4) * height, // pulls it back down off the bottom by p=1
+        w: rand(6, 11),
+        h: rand(9, 16),
+        color: palette[Math.floor(Math.random() * palette.length)],
+        delay: rand(0, 240), // tight burst, not a drawn-out rain
+        dur: rand(1300, 2000),
+        spin: rand(180, 720) * (Math.random() < 0.5 ? -1 : 1),
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, count, color]);
+  }, [width, height, count, color]);
 
   if (reduce) return null;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {pieces.map((piece, i) => (
-        <ConfettiPiece key={i} piece={piece} fallH={fallH} />
+        <ConfettiPiece key={i} piece={piece} />
       ))}
     </View>
   );

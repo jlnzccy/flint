@@ -37,8 +37,9 @@ export const TIMING = {
 /* Gesture dismiss thresholds (sheet + toast). */
 export const DISMISS = { distance: 110, velocity: 800 } as const;
 
-/* Native screen transition duration (see src/app/_layout.tsx). */
-export const SCREEN_DURATION = 300;
+/* Native screen transition duration (see src/app/_layout.tsx). Longer than the
+   stock ~300ms so the iOS parallax push reads as a smooth glide, not a quick snap. */
+export const SCREEN_DURATION = 380;
 
 /* ── Entering presets (layout animations) ──
    Factories so each mount gets a fresh builder. Drive screen-content

@@ -71,9 +71,13 @@ function Root() {
           // hierarchical pushes get the iOS-style parallax push: the incoming screen
           // slides the full width while the outgoing one drifts ~30% behind it, so the
           // background reads as deeper and there's less total motion. Auto-reverses on
-          // back nav (forward/back), and runs on the native thread — smoothest.
+          // back nav (forward/back), and runs on the native thread — smoothest. The
+          // longer SCREEN_DURATION makes the glide smooth rather than a quick snap.
           animation: 'ios_from_right',
           animationDuration: SCREEN_DURATION,
+          // freeze blurred screens (the tabs under a pushed player/editor) so they
+          // don't keep re-rendering mid-transition → less mount hitch on the heavy ones
+          freezeOnBlur: true,
         }}
       >
         {/* on a fresh install onboarding owns the screen — the tabs never mount behind it,

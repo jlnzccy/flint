@@ -1,16 +1,17 @@
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ChunkyButton, CircleBtn } from '@/components/chunky';
-import { IconCheck, IconGear, IconRestart, IconSkip, IconX } from '@/components/icons';
+import { ChunkyButton, ChunkyCard, CircleBtn } from '@/components/chunky';
+import { IconCheck, IconChevD, IconGear, IconRestart, IconSkip, IconX } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
+import { Slider } from '@/components/slider';
 import { TimerRing } from '@/components/timer-ring';
-import { Body, Display, Segmented, StepperBtn, Toggle } from '@/components/ui';
+import { Body, Display, Toggle } from '@/components/ui';
 import { fmtSec } from '@/lib/dates';
-import { doneHaptic } from '@/lib/haptics';
+import { doneHaptic, tapHaptic } from '@/lib/haptics';
 import { playStepDone } from '@/lib/sfx';
 import { useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
@@ -71,19 +72,20 @@ function FreeTimer() {
 }
 
 /* ── Pomodoro config sheet rows ── */
-function StepRow({
+function SliderRow({
   label, sub, value, unit, min, max, step, onChange,
 }: { label: string; sub?: string; value: number; unit?: string; min: number; max: number; step: number; onChange: (v: number) => void }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <View style={{ flex: 1 }}>
-        <Body size={15} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
-        {sub ? <Body size={12} color={t.faint} style={{ marginTop: 1 }}>{sub}</Body> : null}
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Body size={15} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
+          {sub ? <Body size={12} color={t.faint} style={{ marginTop: 1 }}>{sub}</Body> : null}
+        </View>
+        <Display size={16}>{unit ? `${value} ${unit}` : value}</Display>
       </View>
-      <StepperBtn onPress={value > min ? () => onChange(Math.max(min, value - step)) : undefined} label={`${label} less`}>−</StepperBtn>
-      <Display size={16} style={{ minWidth: 58, textAlign: 'center' }}>{unit ? `${value} ${unit}` : value}</Display>
-      <StepperBtn onPress={value < max ? () => onChange(Math.min(max, value + step)) : undefined} label={`${label} more`}>+</StepperBtn>
+      <Slider value={value} min={min} max={max} step={step} onChange={onChange} />
     </View>
   );
 }
@@ -235,11 +237,11 @@ function PomodoroTimer() {
       </View>
 
       <BottomSheet open={cfg} onClose={() => setCfg(false)} title="Pomodoro">
-        <View style={{ gap: 16 }}>
-          <StepRow label="Focus" sub="10 min on a hard day is plenty" value={pomo.focusMin} unit="min" min={5} max={90} step={5} onChange={(v) => setPomodoro({ focusMin: v })} />
-          <StepRow label="Short break" value={pomo.shortBreakMin} unit="min" min={1} max={30} step={1} onChange={(v) => setPomodoro({ shortBreakMin: v })} />
-          <StepRow label="Long break" value={pomo.longBreakMin} unit="min" min={5} max={45} step={5} onChange={(v) => setPomodoro({ longBreakMin: v })} />
-          <StepRow label="Rounds" sub="focus blocks before a long break" value={pomo.cyclesBeforeLong} min={2} max={8} step={1} onChange={(v) => setPomodoro({ cyclesBeforeLong: v })} />
+        <View style={{ gap: 18 }}>
+          <SliderRow label="Focus" sub="10 min on a hard day is plenty" value={pomo.focusMin} unit="min" min={5} max={90} step={5} onChange={(v) => setPomodoro({ focusMin: v })} />
+          <SliderRow label="Short break" value={pomo.shortBreakMin} unit="min" min={1} max={30} step={1} onChange={(v) => setPomodoro({ shortBreakMin: v })} />
+          <SliderRow label="Long break" value={pomo.longBreakMin} unit="min" min={5} max={45} step={5} onChange={(v) => setPomodoro({ longBreakMin: v })} />
+          <SliderRow label="Rounds" sub="focus blocks before a long break" value={pomo.cyclesBeforeLong} min={2} max={8} step={1} onChange={(v) => setPomodoro({ cyclesBeforeLong: v })} />
           <ToggleRow label="Auto-start breaks" on={pomo.autoStartBreaks} onChange={(v) => setPomodoro({ autoStartBreaks: v })} />
           <ToggleRow label="Auto-start focus" on={pomo.autoStartFocus} onChange={(v) => setPomodoro({ autoStartFocus: v })} />
         </View>
@@ -254,6 +256,14 @@ export default function Timer() {
   const insets = useSafeAreaInsets();
   const keepOn = useStore((s) => s.settings.keepOn);
   const [mode, setMode] = useState<'free' | 'pomo'>('free');
+  // pick Free vs Pomodoro in its own sheet (P8); the running timer no longer
+  // shares the screen with the mode switch. Opens on entry, reopened by the chip.
+  const [chooser, setChooser] = useState(true);
+
+  const pick = (m: 'free' | 'pomo') => {
+    setMode(m);
+    setChooser(false);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
@@ -263,20 +273,33 @@ export default function Timer() {
         <CircleBtn size={44} onPress={() => router.back()} label="Exit">
           <IconX color={t.text} />
         </CircleBtn>
-        <View style={{ flex: 1 }}>
-          <Segmented
-            small
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: 'free', label: 'Free' },
-              { value: 'pomo', label: 'Pomodoro' },
-            ]}
-          />
-        </View>
+        {/* mode chip — reopens the chooser; the switch lives in its own surface */}
+        <Pressable
+          onPressIn={() => tapHaptic()}
+          onPress={() => setChooser(true)}
+          accessibilityLabel="Change timer mode"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 14, borderRadius: 13, borderWidth: 2, borderColor: t.lineSoft, backgroundColor: t.surface }}
+        >
+          <Display size={15}>{mode === 'free' ? 'Free' : 'Pomodoro'}</Display>
+          <IconChevD size={16} color={t.muted} />
+        </Pressable>
       </View>
 
       {mode === 'free' ? <FreeTimer /> : <PomodoroTimer />}
+
+      {/* mode chooser (P8) */}
+      <BottomSheet open={chooser} onClose={() => setChooser(false)} title="Choose timer">
+        <View style={{ gap: 12 }}>
+          <ChunkyCard onPress={() => pick('free')} faceStyle={{ padding: 16 }}>
+            <Display size={17}>Free</Display>
+            <Body size={13} color={t.muted} style={{ marginTop: 3 }}>Body-double timer. No routine, no record.</Body>
+          </ChunkyCard>
+          <ChunkyCard onPress={() => pick('pomo')} faceStyle={{ padding: 16 }}>
+            <Display size={17}>Pomodoro</Display>
+            <Body size={13} color={t.muted} style={{ marginTop: 3 }}>Focus → break cycles, lengths your call.</Body>
+          </ChunkyCard>
+        </View>
+      </BottomSheet>
     </View>
   );
 }
