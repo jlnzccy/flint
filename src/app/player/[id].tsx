@@ -339,21 +339,22 @@ export default function Player() {
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       {settings.keepOn && <KeepAwake />}
 
-      {/* top bar — title centered, balanced by a spacer opposite the exit button */}
+      {/* top bar — Back left (previous step, or exit at step 1), X (exit) right */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
+        <CircleBtn size={44} onPress={() => (idx > 0 ? goBack() : setExitConfirm(true))} label={idx > 0 ? 'Previous step' : 'Exit'}>
+          <IconChevL color={t.text} />
+        </CircleBtn>
+        <View style={{ flex: 1, alignItems: 'center', marginHorizontal: 8 }}>
+          <Display size={16} numberOfLines={1} style={{ color: t.muted, textAlign: 'center' }}>
+            {routine.emoji} {routine.name}
+          </Display>
+          {limit && limit < routine.steps.length ? (
+            <Label color={t.faint} style={{ marginTop: 2 }}>short session</Label>
+          ) : null}
+        </View>
         <CircleBtn size={44} onPress={() => setExitConfirm(true)} label="Exit">
           <IconX color={t.text} />
         </CircleBtn>
-        <Display size={16} numberOfLines={1} style={{ color: t.muted, flex: 1, textAlign: 'center', marginHorizontal: 8 }}>
-          {routine.emoji} {routine.name}
-        </Display>
-        {limit && limit < routine.steps.length ? (
-          <Chip style={{ paddingVertical: 5, paddingHorizontal: 10 }}>
-            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.text }}>short session</Text>
-          </Chip>
-        ) : (
-          <View style={{ width: 44 }} />
-        )}
       </View>
 
       {/* progress segments */}
@@ -409,6 +410,11 @@ export default function Player() {
           <Label color={t.faint}>{`${step.min} min${extra ? ` +${extra / 60}` : ''}`}</Label>
         </View>
 
+        {/* next step — readable, right under the timer (P14) */}
+        <Body size={16} color={t.muted} numberOfLines={1} style={{ marginTop: 12, textAlign: 'center', maxWidth: 320 }}>
+          {idx + 1 < steps.length ? `Next: ${idx + 2}. ${steps[idx + 1].t}` : 'Last step — downhill from here'}
+        </Body>
+
         {/* controls sit low, well clear of the clock */}
         <View style={{ flex: 1, width: '100%', alignItems: 'center', justifyContent: paused ? 'flex-start' : 'flex-end', paddingTop: 24, paddingBottom: 8 }}>
         {paused ? (
@@ -460,26 +466,6 @@ export default function Player() {
 
       {/* bottom controls */}
       <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: insets.bottom + 18 }}>
-        {/* secondary row: previous-step (E3, left) + next-step hint (E1, centered) */}
-        <View style={{ justifyContent: 'center', minHeight: 22, marginBottom: 12 }}>
-          {idx > 0 && (
-            <Pressable
-              onPressIn={() => tapHaptic()}
-              onPress={goBack}
-              hitSlop={8}
-              accessibilityLabel="Previous step"
-              style={{ position: 'absolute', left: 0, top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 2 }}
-            >
-              <IconChevL size={15} color={t.faint} />
-              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.faint, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                Back
-              </Text>
-            </Pressable>
-          )}
-          <Body size={13} color={t.faint} numberOfLines={1} style={{ textAlign: 'center', paddingHorizontal: 64 }}>
-            {idx + 1 < steps.length ? `Next step: ${idx + 2}. ${steps[idx + 1].t}` : 'Last step — downhill from here'}
-          </Body>
-        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <CircleBtn onPress={() => setPaused((p) => !p)} label={paused ? 'Resume' : 'Pause'}>
             {paused ? <IconPlay color={t.text} /> : <IconPause color={t.text} />}

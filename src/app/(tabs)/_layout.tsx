@@ -37,12 +37,15 @@ function TabBar({ state, navigation, onAdd }: any) {
           }}
           style={{ flex: 1, alignItems: 'center', paddingTop: 12, paddingBottom: 14 }}
         >
-          {/* icon-only — the active tab gets a rounded accent pill behind it */}
+          {/* icon-only — active tab = rounded square, 2px accent outline + soft fill.
+             inactive keeps a transparent 2px border so the icon never shifts. */}
           <View
             style={{
-              paddingVertical: 7,
-              paddingHorizontal: 18,
-              borderRadius: 13,
+              paddingVertical: 8,
+              paddingHorizontal: 10,
+              borderRadius: 14,
+              borderWidth: 2,
+              borderColor: active ? t.accent.main : 'transparent',
               backgroundColor: active ? t.accent.soft : 'transparent',
             }}
           >
@@ -64,9 +67,9 @@ function TabBar({ state, navigation, onAdd }: any) {
         onPress={onAdd}
         accessibilityLabel="New routine"
         pad={[0, 0]}
-        radius={27}
-        style={{ width: 54, marginTop: -20 }}
-        faceStyle={{ width: 54, height: 54, borderRadius: 27 }}
+        radius={16}
+        style={{ width: 56, marginTop: -16 }}
+        faceStyle={{ width: 56, height: 40, borderRadius: 16 }}
       >
         <IconPlus size={26} color={t.accent.ink} />
       </ChunkyButton>

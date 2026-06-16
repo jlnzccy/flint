@@ -113,10 +113,20 @@ export default function Onboarding() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      {/* skip */}
-      <View style={{ height: 44, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 16 }}>
+      {/* header: page dots centered, Skip pinned right */}
+      <View style={{ height: 44, justifyContent: 'center', paddingHorizontal: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 7, justifyContent: 'center' }}>
+          {Array.from({ length: PAGES }, (_, i) => (
+            <Dot key={i} active={i === page} />
+          ))}
+        </View>
         {page < PAGES - 1 && (
-          <Pressable onPressIn={() => tapHaptic()} onPress={() => finish()} hitSlop={10} style={{ paddingVertical: 6, paddingHorizontal: 8 }}>
+          <Pressable
+            onPressIn={() => tapHaptic()}
+            onPress={() => finish()}
+            hitSlop={10}
+            style={{ position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 8 }}
+          >
             <Label color={t.faint}>Skip</Label>
           </Pressable>
         )}
@@ -218,13 +228,8 @@ export default function Onboarding() {
         </View>
       </ScrollView>
 
-      {/* dots + next */}
-      <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 20, paddingTop: 12, gap: 18 }}>
-        <View style={{ flexDirection: 'row', gap: 7, justifyContent: 'center' }}>
-          {Array.from({ length: PAGES }, (_, i) => (
-            <Dot key={i} active={i === page} />
-          ))}
-        </View>
+      {/* next (dots live in the top header now) */}
+      <View style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 20, paddingTop: 12 }}>
         {page < PAGES - 1 && (
           <ChunkyButton fontSize={17} pad={[17, 24]} onPress={next}>
             Next
