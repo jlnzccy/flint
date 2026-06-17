@@ -2,7 +2,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { InteractionManager, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, FadeIn, runOnJS, SlideInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -116,6 +116,13 @@ export default function Player() {
   const [dumpOpen, setDumpOpen] = useState(false);
   const [dumpText, setDumpText] = useState('');
   const [stats, setStats] = useState<Stats | null>(null);
+  // hold the (closed-on-mount) sheets out of the first frame so their subtrees aren't
+  // built mid-transition — zero UX cost, less to do while the screen slides in.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const h = InteractionManager.runAfterInteractions(() => setReady(true));
+    return () => h.cancel();
+  }, []);
   const results = useRef<StepResult[]>([]);
   const startRef = useRef(Date.now());
   const elapsedRef = useRef(0);
@@ -514,6 +521,8 @@ export default function Player() {
         </View>
       </View>
 
+      {ready && (
+      <>
       {/* steps sheet */}
       <BottomSheet open={stepsOpen} onClose={() => setStepsOpen(false)} title="Steps">
         <View style={{ backgroundColor: t.raised, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, paddingVertical: 4, paddingHorizontal: 16 }}>
@@ -583,6 +592,8 @@ export default function Player() {
           </Text>
         </Pressable>
       </BottomSheet>
+      </>
+      )}
     </View>
   );
 }

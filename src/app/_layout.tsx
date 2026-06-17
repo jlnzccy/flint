@@ -68,11 +68,13 @@ function Root() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: t.bg },
-          // hierarchical pushes get the iOS-style parallax push: the incoming screen
-          // slides the full width while the outgoing one drifts ~30% behind it, so the
-          // background reads as deeper and there's less total motion. Auto-reverses on
-          // back nav (forward/back), and runs on the native thread — smoothest. The
-          // longer SCREEN_DURATION makes the glide smooth rather than a quick snap.
+          // iOS-style parallax page push, system-wide (incoming slides in, outgoing
+          // drifts -30% + dims). On iOS it's already buttery. On Android react-native-
+          // screens shipped this on the SHORT anim-time (~100ms) → the snap we measured,
+          // and it ignores animationDuration for this preset — so we lengthen + ease it
+          // at the native res level instead: android/app/src/main/res/anim/
+          // rns_ios_from_right_*.xml override the library's (app res wins by name) to
+          // 300ms + decelerate. That's the real lever; the prop below is a harmless hint.
           animation: 'ios_from_right',
           animationDuration: SCREEN_DURATION,
           // freeze blurred screens (the tabs under a pushed player/editor) so they

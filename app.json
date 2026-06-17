@@ -60,7 +60,8 @@
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
-      ]
+      ],
+      "./plugins/with-page-transition"
     ],
     "experiments": {
       "typedRoutes": true,

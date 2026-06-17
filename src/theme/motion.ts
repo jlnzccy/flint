@@ -37,12 +37,12 @@ export const TIMING = {
 /* Gesture dismiss thresholds (sheet + toast). */
 export const DISMISS = { distance: 110, velocity: 800 } as const;
 
-/* Native screen transition duration (see src/app/_layout.tsx). Set to the Material
-   spec's full-screen / complex-transition duration (~375ms; 300ms is the small-element
-   standard, >400ms reads as slow) so the iOS parallax push glides rather than snaps.
-   Duration is already in-band — if Android still feels rough, the lever is the easing
-   curve + mount jank, not a longer time. (Material Design motion-duration guidance.) */
-export const SCREEN_DURATION = 375;
+/* Native screen-push duration hint (see src/app/_layout.tsx). NOTE: react-native-screens
+   ignores animationDuration for the `ios_from_right` preset, so on Android the REAL lever
+   is the native res/anim override written by plugins/with-page-transition.js (currently
+   300ms + decelerate) — keep this roughly aligned with that value. iOS uses its own native
+   parallax timing regardless. ~300ms ≈ Duolingo's measured ~290ms glide. */
+export const SCREEN_DURATION = 300;
 
 /* ── Entering presets (layout animations) ──
    Factories so each mount gets a fresh builder. Drive screen-content

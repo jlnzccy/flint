@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { InteractionManager, Pressable, ScrollView, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
@@ -12,6 +13,8 @@ import { Body, Chip, Display, Label, StepperBtn, Toggle, useTimeFmt } from '@/co
 import { routineMin } from '@/data/defaults';
 import { addMins, nowHHMM } from '@/lib/dates';
 import { tapHaptic } from '@/lib/haptics';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { enterFade, enterUp } from '@/theme/motion';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 
@@ -38,6 +41,17 @@ export default function RoutineDetail() {
   const [menu, setMenu] = useState(false);
   const [energy, setEnergy] = useState(false);
   const [customN, setCustomN] = useState(() => Math.min(2, routine?.steps.length ?? 1));
+
+  const reduce = useReducedMotion();
+  // defer the heavy tail (full step list + settings) until the push settles, so the
+  // slide never hitches mid-transition. The hero (icon/name/start) renders immediately.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const h = InteractionManager.runAfterInteractions(() => setReady(true));
+    return () => h.cancel();
+  }, []);
+  // calmed users get a flat fade-in; everyone else gets the staggered rise
+  const entrance = (delay: number) => (reduce ? enterFade(0) : enterUp(delay));
 
   if (!routine) {
     router.back();
@@ -103,7 +117,8 @@ export default function RoutineDetail() {
           </View>
         </View>
 
-        <View style={{ gap: 10, marginTop: 24 }}>
+        {ready && (
+        <Animated.View entering={entrance(0)} style={{ gap: 10, marginTop: 24 }}>
           {routine.steps.map((s, i) => (
             <View
               key={i}
@@ -134,35 +149,40 @@ export default function RoutineDetail() {
               <Body size={13} color={t.faint}>{s.min} min</Body>
             </View>
           ))}
-        </View>
+        </Animated.View>
+        )}
 
-        <Label style={{ marginTop: 26, marginBottom: 8 }}>This routine</Label>
-        <View style={{ gap: 10 }}>
-          <View
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
-              backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Display size={15}>Auto-advance</Display>
-              <Body size={12} color={t.faint} style={{ marginTop: 2 }}>Move to the next step at zero.</Body>
+        {ready && (
+        <Animated.View entering={entrance(60)}>
+          <Label style={{ marginTop: 26, marginBottom: 8 }}>This routine</Label>
+          <View style={{ gap: 10 }}>
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+                backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Display size={15}>Auto-advance</Display>
+                <Body size={12} color={t.faint} style={{ marginTop: 2 }}>Move to the next step at zero.</Body>
+              </View>
+              <Toggle on={!!routine.autoAdvance} onChange={(v) => patch({ autoAdvance: v })} />
             </View>
-            <Toggle on={!!routine.autoAdvance} onChange={(v) => patch({ autoAdvance: v })} />
-          </View>
-          <View
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
-              backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Display size={15}>30-second warning</Display>
-              <Body size={12} color={t.faint} style={{ marginTop: 2 }}>A nudge before each step ends.</Body>
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+                backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Display size={15}>30-second warning</Display>
+                <Body size={12} color={t.faint} style={{ marginTop: 2 }}>A nudge before each step ends.</Body>
+              </View>
+              <Toggle on={!!routine.warn30} onChange={(v) => patch({ warn30: v })} />
             </View>
-            <Toggle on={!!routine.warn30} onChange={(v) => patch({ warn30: v })} />
           </View>
-        </View>
+        </Animated.View>
+        )}
       </ScrollView>
 
       {/* bottom actions */}
