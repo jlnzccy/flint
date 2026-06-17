@@ -14,6 +14,10 @@ interface ChunkyProps {
   faceStyle?: StyleProp<ViewStyle>;
   backColor: string;
   radius?: number;
+  borderTopLeftRadius?: number;
+  borderBottomLeftRadius?: number;
+  borderTopRightRadius?: number;
+  borderBottomRightRadius?: number;
   onPress?: () => void;
   onLongPress?: () => void;
   disabled?: boolean;
@@ -27,22 +31,34 @@ interface ChunkyProps {
 export function Chunky({
   children, faceStyle, backColor, radius = RADIUS, onPress, onLongPress,
   disabled, pressable = true, haptic = true, style, accessibilityLabel,
+  borderTopLeftRadius, borderBottomLeftRadius, borderTopRightRadius, borderBottomRightRadius,
 }: ChunkyProps) {
   const down = useSharedValue(0);
   const anim = useAnimatedStyle(() => ({ transform: [{ translateY: down.value }] }));
 
+  const rStyle = {
+    borderRadius: radius,
+    ...(borderTopLeftRadius !== undefined && { borderTopLeftRadius }),
+    ...(borderBottomLeftRadius !== undefined && { borderBottomLeftRadius }),
+    ...(borderTopRightRadius !== undefined && { borderTopRightRadius }),
+    ...(borderBottomRightRadius !== undefined && { borderBottomRightRadius }),
+  };
+
   const face = (
-    <Animated.View style={[{ borderRadius: radius }, faceStyle, anim]}>{children}</Animated.View>
+    <Animated.View style={[rStyle, faceStyle, anim]}>{children}</Animated.View>
   );
 
   return (
     <View style={style}>
       <View
         pointerEvents="none"
-        style={{
-          position: 'absolute', left: 0, right: 0, top: CHUNK, bottom: 0,
-          borderRadius: radius, backgroundColor: backColor,
-        }}
+        style={[
+          {
+            position: 'absolute', left: 0, right: 0, top: CHUNK, bottom: 0,
+            backgroundColor: backColor,
+          },
+          rStyle
+        ]}
       />
       {pressable ? (
         <Pressable
@@ -84,12 +100,17 @@ interface ChunkyButtonProps {
   fontSize?: number;
   pad?: [number, number]; // [vertical, horizontal]
   radius?: number;
+  borderTopLeftRadius?: number;
+  borderBottomLeftRadius?: number;
+  borderTopRightRadius?: number;
+  borderBottomRightRadius?: number;
   accessibilityLabel?: string;
 }
 
 export function ChunkyButton({
   children, color, deep, ink, ghost, onPress, onLongPress, disabled, haptic,
   style, faceStyle, textStyle, fontSize = 17, pad = [16, 24], radius, accessibilityLabel,
+  borderTopLeftRadius, borderBottomLeftRadius, borderTopRightRadius, borderBottomRightRadius,
 }: ChunkyButtonProps) {
   const t = useTheme();
   const main = color ?? t.accent.main;
@@ -105,6 +126,10 @@ export function ChunkyButton({
     <Chunky
       backColor={backColor}
       radius={radius}
+      borderTopLeftRadius={borderTopLeftRadius}
+      borderBottomLeftRadius={borderBottomLeftRadius}
+      borderTopRightRadius={borderTopRightRadius}
+      borderBottomRightRadius={borderBottomRightRadius}
       onPress={onPress}
       onLongPress={onLongPress}
       disabled={disabled}
@@ -181,8 +206,8 @@ export function ChunkyCard({ children, onPress, onLongPress, style, faceStyle, b
 
 /* ── CircleBtn — round ghost icon button ── */
 export function CircleBtn({
-  children, onPress, size = 56, label,
-}: { children: React.ReactNode; onPress?: () => void; size?: number; label?: string }) {
+  children, onPress, size = 56, label, style,
+}: { children: React.ReactNode; onPress?: () => void; size?: number; label?: string; style?: StyleProp<ViewStyle> }) {
   return (
     <ChunkyButton
       ghost
@@ -190,7 +215,7 @@ export function CircleBtn({
       accessibilityLabel={label}
       pad={[0, 0]}
       radius={size / 2}
-      style={{ width: size }}
+      style={[{ width: size }, style]}
       faceStyle={{ width: size, height: size, borderRadius: size / 2 }}
     >
       {children}

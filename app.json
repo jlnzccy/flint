@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flint",
     "slug": "flint",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "flint",
@@ -61,7 +61,21 @@
           "enableBackgroundPlayback": false
         }
       ],
-      "./plugins/with-page-transition"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Flint to use the camera to scan routine QR codes."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Flint to access your photos to save routine ticket stubs.",
+          "savePhotosPermission": "Allow Flint to save routine ticket stubs to your library."
+        }
+      ],
+      "./plugins/with-page-transition",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

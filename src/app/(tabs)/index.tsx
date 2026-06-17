@@ -79,6 +79,7 @@ export default function TodayScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
 
+
   // which day is on screen — defaults to today; pager looks ahead/behind
   const todayK = todayKey();
   const [viewKey, setViewKey] = useState(todayK);
@@ -407,7 +408,10 @@ export default function TodayScreen() {
           duplicateRoutine(r.id);
           toast('Duplicated');
         }}
-        onShare={() => toast('Coming soon')}
+        onShare={(r) => {
+          setPreview(null);
+          router.push(`/share?id=${r.id}`);
+        }}
         onBump={(r) => {
           bump(r.id);
           toast('See you tomorrow');

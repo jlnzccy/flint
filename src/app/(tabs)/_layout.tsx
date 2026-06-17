@@ -35,7 +35,7 @@ function TabBar({ state, navigation, onAdd }: any) {
             tapHaptic();
             if (!active) navigation.navigate(route.name);
           }}
-          style={{ flex: 1, alignItems: 'center', paddingTop: 16, paddingBottom: 18 }}
+          style={{ width: '20%', alignItems: 'center', paddingTop: 16, paddingBottom: 18 }}
         >
           {/* icon-only — active tab = rounded square, 2px accent outline + soft fill.
              inactive keeps a transparent 2px border so the icon never shifts. */}
@@ -47,6 +47,8 @@ function TabBar({ state, navigation, onAdd }: any) {
               borderWidth: 2,
               borderColor: active ? t.accent.main : 'transparent',
               backgroundColor: active ? t.accent.soft : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <def.Icon size={24} color={active ? t.accent.main : t.faint} />
@@ -60,7 +62,7 @@ function TabBar({ state, navigation, onAdd }: any) {
   // sits flush inside the bar (no negative margin) — the row centers it against the icons.
   const mid = Math.ceil(tabs.length / 2);
   const addBtn = (
-    <View key="add" style={{ width: 64, alignItems: 'center' }}>
+    <View key="add" style={{ width: '20%', alignItems: 'center', justifyContent: 'center' }}>
       <ChunkyButton
         color={t.accent.main}
         deep={t.accent.deep}

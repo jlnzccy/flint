@@ -21,7 +21,7 @@ const SCREEN_H = Dimensions.get('window').height;
 interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
-  title?: string;
+  title?: string | React.ReactNode;
   /* false = render children directly (caller owns scrolling, e.g. emoji grid) */
   scroll?: boolean;
   children: React.ReactNode;
@@ -139,7 +139,13 @@ export function BottomSheet({ open, onClose, title, scroll = true, children }: B
             <GestureDetector gesture={pan}>
               <View collapsable={false}>
                 <View style={{ width: 42, height: 5, borderRadius: 99, backgroundColor: t.line, alignSelf: 'center', marginTop: 4, marginBottom: 14 }} />
-                {title ? <Display size={18} style={{ marginBottom: 12 }}>{title}</Display> : null}
+                {title ? (
+                  typeof title === 'string' ? (
+                    <Display size={18} style={{ marginBottom: 12 }}>{title}</Display>
+                  ) : (
+                    title
+                  )
+                ) : null}
               </View>
             </GestureDetector>
             {scroll ? (

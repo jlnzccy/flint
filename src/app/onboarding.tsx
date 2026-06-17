@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
 import { FireAnim } from '@/components/fire-anim';
-import { IconPlus } from '@/components/icons';
+import { IconPlay, IconPlus } from '@/components/icons';
 import { StepPicker } from '@/components/new-routine-sheet';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Display, EmojiTile, Label } from '@/components/ui';
@@ -18,14 +18,15 @@ import { useToast } from '@/components/toast';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
+import { ACCENT_CHOICES, hexDarken } from '@/theme/colors';
 
 const SLIDES = [
   { title: 'No streaks to lose', body: 'No points, no shame for an off day. The app only ever notices that you showed up.', emoji: '🌱' },
   { title: 'Start with step one', body: 'Each routine breaks into small timed steps. Open it, do the first tiny thing. That’s the whole trick.', emoji: '🎯' },
 ];
 
-// welcome + intro slides + reminders + starter
-const PAGES = 1 + SLIDES.length + 1 + 1;
+// welcome + intro slides + theme + reminders + starter
+const PAGES = 1 + SLIDES.length + 1 + 1 + 1;
 
 // centers a short page's content vertically so it doesn't strand a wall of empty space
 const PAGE = { flexGrow: 1, justifyContent: 'center' as const, paddingHorizontal: 24, paddingVertical: 24 };
@@ -71,7 +72,9 @@ export default function Onboarding() {
   const { width } = useWindowDimensions();
 
   const complete = useStore((s) => s.completeOnboarding);
-  const { setSettings } = useStore.getState();
+  const settings = useStore((s) => s.settings);
+  const accent = useStore((s) => s.accent);
+  const { setSettings, setAccent } = useStore.getState();
 
   const ref = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
@@ -101,8 +104,9 @@ export default function Onboarding() {
     ref.current?.scrollTo({ x: width * (page + 1), animated: true });
   };
 
-  // reminders page index: welcome + intro slides, then the bell page
-  const remindersPage = 1 + SLIDES.length;
+  // theme and reminders page indexes
+  const themePage = 1 + SLIDES.length;
+  const remindersPage = themePage + 1;
 
   // Next doubles as the notifications opt-in on the reminders page (S3): it requests
   // permission once, then always advances — declining never traps the user (P16).
@@ -169,6 +173,184 @@ export default function Onboarding() {
             </Body>
           </View>
         ))}
+
+        {/* theme configuration */}
+        <View style={{ width }}>
+          <ScrollView contentContainerStyle={PAGE} showsVerticalScrollIndicator={false}>
+            <Display size={26} style={{ textAlign: 'center', marginTop: 8 }}>Make it yours</Display>
+            <Body size={14} color={t.muted} style={{ textAlign: 'center', marginTop: 5, marginBottom: 16, lineHeight: 20 }}>
+              Choose how Flint looks and feels. You can change these any time in Settings.
+            </Body>
+ 
+            {/* Retro Game Bezel Screen */}
+            <View
+              style={{
+                backgroundColor: t.raised,
+                borderWidth: 4,
+                borderColor: t.line,
+                borderRadius: 20,
+                padding: 12,
+                paddingBottom: 16,
+                marginBottom: 16,
+                width: '100%',
+              }}
+            >
+              {/* Bezel Title Bar */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, opacity: 0.6 }}>
+                <Label color={t.faint} style={{ fontSize: 9, letterSpacing: 1.5 }}>FLINT CONSOLE v1.0</Label>
+                <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent.main }} />
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.line }} />
+                </View>
+              </View>
+ 
+              {/* The Live Interactive Preview Card */}
+              <ChunkyCard
+                borderColor={t.lineSoft}
+                backColor={t.lineSoft}
+                faceStyle={{ padding: 14 }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%' }}>
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      backgroundColor: t.accent.soft,
+                      borderWidth: 2,
+                      borderColor: t.accent.main,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <IconPlay size={16} color={t.accent.main} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Display size={15} numberOfLines={1}>Morning Routine</Display>
+                    <Body size={11.5} color={t.faint} numberOfLines={1}>3 steps · 15 min</Body>
+                  </View>
+                  {/* Circular Play Button on the right, matching the play circle update */}
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      borderWidth: 2.5,
+                      borderColor: t.accent.main,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <IconPlay size={16} color={t.accent.main} />
+                  </View>
+                </View>
+              </ChunkyCard>
+            </View>
+ 
+            {/* Unified Console Controller Deck */}
+            <ChunkyCard
+              borderColor={t.lineSoft}
+              backColor={t.lineSoft}
+              faceStyle={{ padding: 16, gap: 14 }}
+            >
+              {/* Row 1: Style Profile */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Label style={{ width: 75, fontSize: 11 }}>Style</Label>
+                <View style={{ flexDirection: 'row', flex: 1, backgroundColor: t.raised, borderRadius: 12, padding: 3, borderWidth: 1.5, borderColor: t.line }}>
+                  {[
+                    { value: 'ember', label: 'Ember' },
+                    { value: 'neutral', label: 'Neutral' },
+                  ].map((opt) => {
+                    const active = (settings.themeStyle ?? 'ember') === opt.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        onPressIn={() => tapHaptic()}
+                        onPress={() => setSettings({ themeStyle: opt.value as any })}
+                        style={{
+                          flex: 1,
+                          backgroundColor: active ? t.accent.main : 'transparent',
+                          borderRadius: 9,
+                          paddingVertical: 8,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: active ? t.accent.ink : t.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+ 
+              {/* Row 2: App Theme */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Label style={{ width: 75, fontSize: 11 }}>Theme</Label>
+                <View style={{ flexDirection: 'row', flex: 1, backgroundColor: t.raised, borderRadius: 12, padding: 3, borderWidth: 1.5, borderColor: t.line }}>
+                  {[
+                    { value: 'dark', label: 'Dark' },
+                    { value: 'light', label: 'Light' },
+                    { value: 'system', label: 'Auto' },
+                  ].map((opt) => {
+                    const active = settings.theme === opt.value;
+                    return (
+                      <Pressable
+                        key={opt.value}
+                        onPressIn={() => tapHaptic()}
+                        onPress={() => setSettings({ theme: opt.value as any })}
+                        style={{
+                          flex: 1,
+                          backgroundColor: active ? t.accent.main : 'transparent',
+                          borderRadius: 9,
+                          paddingVertical: 8,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: active ? t.accent.ink : t.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          {opt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+ 
+              {/* Row 3: Accent Color */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Label style={{ width: 75, fontSize: 11 }}>Color</Label>
+                <View style={{ flexDirection: 'row', flex: 1, justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 }}>
+                  {ACCENT_CHOICES.map((a) => {
+                    const active = a === accent;
+                    const dark = hexDarken(a, 0.55);
+                    return (
+                      <Pressable
+                        key={a}
+                        accessibilityLabel={a}
+                        onPressIn={() => tapHaptic()}
+                        onPress={() => setAccent(a)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: a,
+                          borderWidth: active ? 2.5 : 1.5,
+                          borderColor: active ? dark : t.line,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          transform: [{ scale: active ? 1.15 : 1 }],
+                        }}
+                      >
+                        {/* tonal ring + dot — a darker shade of the swatch, not black */}
+                        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: dark }} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </ChunkyCard>
+          </ScrollView>
+        </View>
 
         {/* reminders */}
         <View style={{ width }}>

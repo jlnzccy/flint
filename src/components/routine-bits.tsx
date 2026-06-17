@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
-import { IconAlarm, IconArchive, IconBell, IconCheck, IconPencil, IconPlus, IconShare, IconTrash } from '@/components/icons';
+import { IconAlarm, IconArchive, IconBell, IconCheck, IconPencil, IconPlay, IconPlus, IconShare, IconTrash } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Chip, Display, EmojiTile, Label, useTimeFmt } from '@/components/ui';
 import { Routine, routineMin } from '@/data/defaults';
@@ -63,7 +63,16 @@ export function RoutineCard({ routine, done, bumped, remindersOn, readonly, onPr
             <IconCheck size={16} color={t.green.ink} />
           </View>
         ) : !bumped && !readonly ? (
-          <Label color={c.main}>GO</Label>
+          // bold-ring play circle with centered triangle (matches onboarding preview)
+          <View
+            style={{
+              width: 32, height: 32, borderRadius: 16,
+              borderWidth: 2.5, borderColor: c.main,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <IconPlay size={16} color={c.main} />
+          </View>
         ) : null}
       </View>
     </ChunkyCard>

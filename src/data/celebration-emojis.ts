@@ -7,6 +7,9 @@ export const CELEBRATION_LOTTIE: string[] = [
   '2764_fe0f_200d_1f525', '1f483', '1fab7', '2604_fe0f', '1f995', '1f422', '1f40a',
   '1f416', '1f410', '1f423', '1f99a', '1f426_200d_1f525', '1f9ad', '1f433', '1f419',
   '1fabc', '1faa9', '1f386', '1f3c6', '1fa8e', '1f451',
+  // New celebration emojis
+  '1f61b', '1f61d', '1f61c', '1f92a', '1f92d', '1fae1', '1f639', '1f63b', '1f918',
+  '1faf0', '1f90c', '1f989', '1f982', '1f37b', '1f942', '1f37e', '1f375', '1f947', '1f3c1',
 ];
 
 /* Float pool (U3) — the small animated emojis that drift/bob around the celebration

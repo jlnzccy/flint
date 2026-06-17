@@ -42,6 +42,17 @@ export const DARK: BaseColors = {
   faint: '#71665c',
 };
 
+export const NEUTRAL_DARK: BaseColors = {
+  bg: '#121214',
+  surface: '#1a1a1e',
+  raised: '#242429',
+  line: '#323239',
+  lineSoft: '#212126',
+  text: '#f5f5f7',
+  muted: '#9ea0a5',
+  faint: '#686a6e',
+};
+
 export const LIGHT: BaseColors = {
   bg: '#faf8f5',
   surface: '#ffffff',
@@ -51,6 +62,17 @@ export const LIGHT: BaseColors = {
   text: '#2a2018',
   muted: '#756758',
   faint: '#a99b89',
+};
+
+export const NEUTRAL_LIGHT: BaseColors = {
+  bg: '#f5f6f8',
+  surface: '#ffffff',
+  raised: '#ebecee',
+  line: '#dcdde1',
+  lineSoft: '#e8e9ec',
+  text: '#1c1e21',
+  muted: '#686a6e',
+  faint: '#9ea0a5',
 };
 
 interface AccentDef {
@@ -87,14 +109,22 @@ export interface Palette extends BaseColors {
   col: (name: string) => ColorSet; // preset name or custom "#rrggbb"
 }
 
-/* readable text color on top of a solid fill */
+/* readable text color on top of a solid fill.
+   Uses gamma-correct relative luminance (sRGB) so saturated mids land in the
+   right bucket — crude weighted-RGB rated orange/blue as "light" and stuck dark
+   text on them. Threshold leans white (0.4, above the ~0.18 WCAG crossover) to
+   match the design's taste: white ink on purple/rose/orange, dark on gold/teal/green. */
 export function inkOn(hex: string): string {
   const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.56 ? '#1b1109' : '#f7f1e8';
+  const lin = (v: number) => {
+    const s = v / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const L =
+    0.2126 * lin((n >> 16) & 255) +
+    0.7152 * lin((n >> 8) & 255) +
+    0.0722 * lin(n & 255);
+  return L > 0.4 ? '#1b1109' : '#f7f1e8';
 }
 
 function softOf(def: AccentDef, theme: ThemeName): string {
@@ -102,9 +132,16 @@ function softOf(def: AccentDef, theme: ThemeName): string {
   return theme === 'light' ? hexAlpha(def.deep, 0.13) : hexAlpha(def.main, 0.13);
 }
 
-export function buildPalette(theme: ThemeName, accentHex: string): Palette {
-  const base = theme === 'light' ? LIGHT : DARK;
-  const accentDef: AccentDef = { main: accentHex, deep: hexDarken(accentHex, 0.62), ink: '#1b1109' };
+export function buildPalette(theme: ThemeName, style: 'ember' | 'neutral', accentHex: string): Palette {
+  const base = style === 'neutral'
+    ? (theme === 'light' ? NEUTRAL_LIGHT : NEUTRAL_DARK)
+    : (theme === 'light' ? LIGHT : DARK);
+  const matchedPreset = Object.values(STATIC_ACCENTS).find(
+    (preset) => preset.main.toLowerCase() === accentHex.toLowerCase()
+  );
+  const accentDef: AccentDef = matchedPreset
+    ? { main: accentHex, deep: matchedPreset.deep, ink: matchedPreset.ink }
+    : { main: accentHex, deep: hexDarken(accentHex, 0.62), ink: inkOn(accentHex) };
   const mk = (def: AccentDef, soft?: string): ColorSet => ({
     main: def.main,
     deep: def.deep,

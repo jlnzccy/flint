@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
-import { IconChevL, IconPlus } from '@/components/icons';
+import { IconChevL, IconPlus, IconScan } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Checkbox, Display, EmojiTile, Label } from '@/components/ui';
 import { ROUTINE_TEMPLATES, RoutineTemplate, routineMin } from '@/data/defaults';
@@ -26,8 +26,10 @@ export function NewRoutineSheet({ open, onClose }: { open: boolean; onClose: () 
     router.push(href);
   };
 
+  const headerTitle = picked ? 'Choose steps' : 'New routine';
+
   return (
-    <BottomSheet open={open} onClose={onClose} title={picked ? 'Choose steps' : 'New routine'} scroll={false}>
+    <BottomSheet open={open} onClose={onClose} title={headerTitle} scroll={false}>
       {picked ? (
         <StepPicker
           template={picked}
@@ -36,18 +38,37 @@ export function NewRoutineSheet({ open, onClose }: { open: boolean; onClose: () 
         />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-          <ChunkyButton
-            ghost
-            fontSize={15}
-            pad={[14, 18]}
-            faceStyle={{ justifyContent: 'flex-start' }}
-            onPress={() => go('/editor')}
-          >
-            <IconPlus size={16} color={t.text} />
-            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-              Blank routine
-            </Text>
-          </ChunkyButton>
+          {/* Segmented/Split chunky button deck */}
+          <View style={{ flexDirection: 'row', width: '100%', marginBottom: 12 }}>
+            <View style={{ flex: 1 }}>
+              <ChunkyButton
+                ghost
+                fontSize={14}
+                pad={[14, 16]}
+                borderTopRightRadius={0}
+                borderBottomRightRadius={0}
+                faceStyle={{ height: 50, borderRightWidth: 1, justifyContent: 'flex-start', paddingLeft: 18 }}
+                onPress={() => go('/editor')}
+              >
+                <IconPlus size={15} color={t.text} />
+                <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 14.5, color: t.text, textTransform: 'uppercase', letterSpacing: 0.8, marginLeft: 6 }}>
+                  Blank routine
+                </Text>
+              </ChunkyButton>
+            </View>
+            <View style={{ width: 58 }}>
+              <ChunkyButton
+                ghost
+                pad={[14, 0]}
+                borderTopLeftRadius={0}
+                borderBottomLeftRadius={0}
+                faceStyle={{ height: 50, borderLeftWidth: 1, justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => go('/scan')}
+              >
+                <IconScan size={22} color={t.accent.main} />
+              </ChunkyButton>
+            </View>
+          </View>
 
           <Label style={{ marginTop: 22, marginBottom: 10 }}>Start from a template</Label>
           <View style={{ gap: 10 }}>

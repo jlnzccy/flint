@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedEmoji } from '@/components/animated-emoji';
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
-import { IconBell, IconClock, IconDots, IconPencil, IconX } from '@/components/icons';
+import { IconBell, IconClock, IconDots, IconPencil, IconX, IconShare } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { useToast } from '@/components/toast';
 import { Body, Chip, Display, Label, StepperBtn, Toggle, useTimeFmt } from '@/components/ui';
@@ -17,6 +17,8 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { enterFade, enterUp } from '@/theme/motion';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
+import QRCode from 'react-native-qrcode-svg';
+import { serializeRoutine } from '@/lib/share';
 
 export default function RoutineDetail() {
   const t = useTheme();
@@ -211,6 +213,21 @@ export default function RoutineDetail() {
             <IconPencil size={16} color={t.text} />
             <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
               Edit routine
+            </Text>
+          </ChunkyButton>
+          <ChunkyButton
+            ghost
+            fontSize={15}
+            pad={[14, 18]}
+            faceStyle={{ justifyContent: 'flex-start' }}
+            onPress={() => {
+              setMenu(false);
+              router.push(`/share?id=${routine.id}`);
+            }}
+          >
+            <IconShare size={16} color={t.text} />
+            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+              Share routine
             </Text>
           </ChunkyButton>
           {!bumped[routine.id] && (

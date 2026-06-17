@@ -284,7 +284,6 @@ export default function Player() {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
         <Confetti color={c.main} />
-        <EmojiConfetti />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 20 }}
@@ -292,6 +291,7 @@ export default function Player() {
         >
           <Animated.View entering={FadeIn.duration(350)} style={{ alignItems: 'center', justifyContent: 'center' }}>
             <View style={{ width: 210, height: 210, alignItems: 'center', justifyContent: 'center' }}>
+              <EmojiConfetti />
               <Animated.View entering={ZoomIn.springify().damping(11).stiffness(150).mass(0.7)}>
                 <CelebrationEmoji size={150} />
               </Animated.View>

@@ -5,7 +5,7 @@ import { vars } from 'nativewind';
 import { buildPalette, Palette } from './colors';
 import { useStore } from '@/state/store';
 
-const ThemeContext = createContext<Palette>(buildPalette('dark', '#ff6b35'));
+const ThemeContext = createContext<Palette>(buildPalette('dark', 'ember', '#ff6b35'));
 
 export function useTheme(): Palette {
   return useContext(ThemeContext);
@@ -13,13 +13,14 @@ export function useTheme(): Palette {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const themePref = useStore((s) => s.settings.theme);
+  const themeStyle = useStore((s) => s.settings.themeStyle ?? 'ember');
   const accent = useStore((s) => s.accent);
   const system = useColorScheme();
 
   const palette = useMemo(() => {
     const eff = themePref === 'system' ? (system === 'light' ? 'light' : 'dark') : themePref;
-    return buildPalette(eff, accent);
-  }, [themePref, system, accent]);
+    return buildPalette(eff, themeStyle, accent);
+  }, [themePref, themeStyle, system, accent]);
 
   const cssVars = useMemo(
     () =>

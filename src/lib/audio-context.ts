@@ -34,10 +34,5 @@ export function createAudioContext(): any {
     const r = AudioManager.getDevicePreferredSampleRate();
     if (r && r > 0) sampleRate = r;
   } catch {}
-  // diagnostic: grep `adb logcat` for FLINT_AUDIO to see chosen rate + active route
-  console.log('FLINT_AUDIO sampleRate', sampleRate);
-  AudioManager.getDevicesInfo?.()
-    .then((d: any) => console.log('FLINT_AUDIO outputs', JSON.stringify(d?.currentOutputs ?? d)))
-    .catch(() => {});
   return sampleRate ? new AudioContext({ sampleRate }) : new AudioContext();
 }

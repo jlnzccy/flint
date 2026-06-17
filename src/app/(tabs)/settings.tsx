@@ -1,26 +1,52 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ColorPickerSheet } from '@/components/color-picker';
-import { IconChevR, IconPlus, IconTrash } from '@/components/icons';
-import { finishHaptic, tapHaptic, warnHaptic } from '@/lib/haptics';
-import { useToast } from '@/components/toast';
-import { Body, Display, Label, Segmented, Toggle } from '@/components/ui';
-import { ACCENT_CHOICES } from '@/theme/colors';
-import { ensurePermission } from '@/lib/notifications';
-import { useStore } from '@/state/store';
+import {
+  IconArchive,
+  IconBell,
+  IconChevR,
+  IconFlag,
+  IconPencil,
+  IconWaves,
+} from '@/components/icons';
+import { Body, Display } from '@/components/ui';
 import { useTheme } from '@/theme/theme';
 
-function Row({ title, sub, children, top }: { title: string; sub?: string; children?: React.ReactNode; top?: boolean }) {
+function Row({
+  title,
+  sub,
+  icon,
+  children,
+  top,
+}: {
+  title: string;
+  sub?: string;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+  top?: boolean;
+}) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderTopWidth: top ? 0 : 2, borderColor: t.lineSoft }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        padding: 16,
+        borderTopWidth: top ? 0 : 2,
+        borderColor: t.lineSoft,
+      }}
+    >
+      {icon}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Display size={16}>{title}</Display>
-        {sub ? <Body size={13} color={t.faint} style={{ marginTop: 3 }}>{sub}</Body> : null}
+        {sub ? (
+          <Body size={13} color={t.faint} style={{ marginTop: 3 }}>
+            {sub}
+          </Body>
+        ) : null}
       </View>
       {children}
     </View>
@@ -29,268 +55,174 @@ function Row({ title, sub, children, top }: { title: string; sub?: string; child
 
 function Card({ children }: { children: React.ReactNode }) {
   const t = useTheme();
-  return <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18 }}>{children}</View>;
-}
-
-// Delete-all (H4): hold to confirm. A tap fires onPressIn→onPressOut almost
-// instantly, cancels before HOLD_MS, and does nothing — only a sustained hold
-// fills the bar and wipes. resetAll() flips onboarded → the navigator guard
-// swaps back to onboarding on its own (no manual nav).
-const HOLD_MS = 1500;
-
-function HoldDelete() {
-  const t = useTheme();
-  const toast = useToast();
-  const fill = useSharedValue(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [holding, setHolding] = useState(false);
-
-  const cancel = () => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    setHolding(false);
-    fill.value = withTiming(0, { duration: 160 });
-  };
-  const start = () => {
-    setHolding(true);
-    warnHaptic();
-    fill.value = withTiming(1, { duration: HOLD_MS });
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setHolding(false);
-      fill.value = 0;
-      finishHaptic();
-      useStore.getState().resetAll();
-      toast('Erased');
-    }, HOLD_MS);
-  };
-  // never leave a timer running if the screen unmounts mid-hold
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
-
-  const fillStyle = useAnimatedStyle(() => ({ width: `${fill.value * 100}%` }));
-
   return (
-    <>
-      <Pressable
-        onPressIn={start}
-        onPressOut={cancel}
-        accessibilityLabel="Hold to delete all data"
-        style={{
-          marginTop: 26, height: 56, borderRadius: 18, overflow: 'hidden',
-          borderWidth: 2, borderColor: t.accent.main, backgroundColor: t.surface,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-        }}
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[{ position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: t.accent.main, opacity: 0.22 }, fillStyle]}
-        />
-        <IconTrash size={16} color={t.accent.main} />
-        <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 14, color: t.accent.main, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-          {holding ? 'Keep holding…' : 'Hold to delete all data'}
-        </Text>
-      </Pressable>
-      <Body size={12} color={t.faint} style={{ textAlign: 'center', marginTop: 8 }}>
-        Erases everything and starts over. Can't be undone.
-      </Body>
-    </>
+    <View
+      style={{
+        backgroundColor: t.surface,
+        borderWidth: 2,
+        borderColor: t.lineSoft,
+        borderRadius: 18,
+      }}
+    >
+      {children}
+    </View>
   );
 }
 
 export default function Settings() {
   const t = useTheme();
-  const toast = useToast();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const settings = useStore((s) => s.settings);
-  const accent = useStore((s) => s.accent);
-  const { setSettings, setAccent } = useStore.getState();
-  const [accentOpen, setAccentOpen] = useState(false);
-  const customAccent = !ACCENT_CHOICES.includes(accent as (typeof ACCENT_CHOICES)[number]);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
         <Display size={30}>Settings</Display>
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
-        <Label style={{ marginTop: 20, marginBottom: 8 }}>Reminders</Label>
-        <Card>
-          <Row title="Reminders" top>
-            <Toggle
-              on={settings.remindersOn}
-              onChange={async (v) => {
-                if (v) {
-                  const ok = await ensurePermission();
-                  if (!ok) {
-                    toast('Allow notifications in system settings');
-                    return;
-                  }
-                }
-                setSettings({ remindersOn: v });
-              }}
-            />
-          </Row>
-        </Card>
 
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Feedback</Label>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 28 }}
+        showsVerticalScrollIndicator={false}
+      >
         <Card>
-          <Row title="Haptics" top>
-            <Toggle on={settings.haptics} onChange={(v) => setSettings({ haptics: v })} />
-          </Row>
-          <Row title="Voice guide" sub="Reads each step aloud">
-            <Toggle on={settings.voice} onChange={(v) => setSettings({ voice: v })} />
-          </Row>
-        </Card>
-
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Display</Label>
-        <Card>
-          <View style={{ padding: 16, gap: 12 }}>
-            <Display size={16}>Theme</Display>
-            <Segmented
-              value={settings.theme}
-              onChange={(v) => setSettings({ theme: v })}
-              options={[
-                { value: 'dark', label: 'Dark' },
-                { value: 'light', label: 'Light' },
-                { value: 'system', label: 'Auto' },
-              ]}
-            />
-          </View>
-          <Row title="Keep screen on" sub="During a routine">
-            <Toggle on={settings.keepOn} onChange={(v) => setSettings({ keepOn: v })} />
-          </Row>
-          <Row title="Count-up timer" sub="Ring fills instead of drains">
-            <Toggle on={settings.countUp} onChange={(v) => setSettings({ countUp: v })} />
-          </Row>
-          <Row title="Reduce motion" sub="Calm the pulsing and animations">
-            <Toggle on={settings.reduceMotion} onChange={(v) => setSettings({ reduceMotion: v })} />
-          </Row>
-          <View style={{ padding: 16, borderTopWidth: 2, borderColor: t.lineSoft, gap: 12 }}>
-            <Display size={16}>Clock</Display>
-            <Segmented
-              value={settings.clock}
-              onChange={(v) => setSettings({ clock: v })}
-              options={[
-                { value: 'system', label: 'Auto' },
-                { value: '12', label: '12h' },
-                { value: '24', label: '24h' },
-              ]}
-            />
-          </View>
-          <View style={{ padding: 16, borderTopWidth: 2, borderColor: t.lineSoft, gap: 12 }}>
-            <Display size={16}>Accent</Display>
-            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-              {ACCENT_CHOICES.map((a) => (
-                <Pressable
-                  key={a}
-                  accessibilityLabel={a}
-                  onPressIn={() => tapHaptic()}
-                  onPress={() => setAccent(a)}
+          <Pressable onPress={() => router.push('/settings/preferences')}>
+            <Row
+              title="Preferences"
+              sub="Theme, accent color, clock format, motion"
+              icon={
+                <View
                   style={{
-                    width: 40, height: 40, borderRadius: 20, backgroundColor: a,
-                    borderWidth: 3, borderColor: a === accent ? t.text : 'transparent',
-                    transform: [{ scale: a === accent ? 1.12 : 1 }],
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    backgroundColor: t.purple.soft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
-                />
-              ))}
-              {/* trailing custom slot — opens the picker, recolors in place (P17) */}
-              <Pressable
-                accessibilityLabel={customAccent ? 'Edit custom accent' : 'Custom accent'}
-                onPressIn={() => tapHaptic()}
-                onPress={() => setAccentOpen(true)}
-                style={{
-                  width: 40, height: 40, borderRadius: 20,
-                  backgroundColor: customAccent ? accent : t.raised,
-                  borderWidth: customAccent ? 3 : 2,
-                  borderColor: customAccent ? t.text : t.line,
-                  alignItems: 'center', justifyContent: 'center',
-                  transform: [{ scale: customAccent ? 1.12 : 1 }],
-                }}
-              >
-                {customAccent ? null : <IconPlus size={16} color={t.muted} />}
-              </Pressable>
-            </View>
-
-            {/* Material You — visible tease only, applies nothing yet (P18) */}
-            <Pressable
-              accessibilityLabel="Material You"
-              onPressIn={() => tapHaptic()}
-              onPress={() => toast('Coming soon')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}
+                >
+                  <IconPencil size={18} color={t.purple.main} />
+                </View>
+              }
+              top
             >
-              <View style={{ flex: 1 }}>
-                <Body size={14} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>Material You</Body>
-                <Body size={12} color={t.faint} style={{ marginTop: 1 }}>Match your wallpaper</Body>
-              </View>
-              <Body size={12} color={t.faint}>Coming soon</Body>
-            </Pressable>
-          </View>
-        </Card>
-
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Progress</Label>
-        <Card>
-          <Row title="Streaks" sub="Streak counter + show-up history" top>
-            <Toggle on={settings.streaks} onChange={(v) => setSettings({ streaks: v })} />
-          </Row>
-          {settings.streaks && (
-            <Row title="Streak never dies" sub="A missed day pauses it, never resets it">
-              <Toggle on={settings.streakNeverDies} onChange={(v) => setSettings({ streakNeverDies: v })} />
+              <IconChevR size={18} color={t.faint} />
             </Row>
-          )}
-        </Card>
+          </Pressable>
 
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Demo</Label>
-        <Card>
-          <Pressable
-            onPress={() => {
-              useStore.getState().loadDemo();
-              finishHaptic();
-              toast('Demo loaded');
-            }}
-          >
-            <Row title="Load demo data" sub="Sample routines, tasks & a month of insights" top>
+          <Pressable onPress={() => router.push('/settings/notifications')}>
+            <Row
+              title="Notifications & Feedback"
+              sub="Daily reminders, voice guide, haptic cues"
+              icon={
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    backgroundColor: t.rose.soft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconBell size={18} color={t.rose.main} />
+                </View>
+              }
+            >
+              <IconChevR size={18} color={t.faint} />
+            </Row>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/settings/progress')}>
+            <Row
+              title="Progress & Streaks"
+              sub="Streak counting and preservation rules"
+              icon={
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    backgroundColor: t.green.soft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconFlag size={18} color={t.green.main} />
+                </View>
+              }
+            >
+              <IconChevR size={18} color={t.faint} />
+            </Row>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/settings/labs')}>
+            <Row
+              title="Experimental Labs"
+              sub="Brainwave sounds, haptic feedback test bed"
+              icon={
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    backgroundColor: t.teal.soft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconWaves size={18} color={t.teal.main} />
+                </View>
+              }
+            >
+              <IconChevR size={18} color={t.faint} />
+            </Row>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/settings/data')}>
+            <Row
+              title="System & Data"
+              sub="Manage and erase your data"
+              icon={
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    backgroundColor: t.gold.soft,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <IconArchive size={18} color={t.gold.main} />
+                </View>
+              }
+            >
               <IconChevR size={18} color={t.faint} />
             </Row>
           </Pressable>
         </Card>
 
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Experimental</Label>
-        <Card>
-          <Pressable onPress={() => router.push('/sounds' as never)}>
-            <Row title="Sounds" sub="Brainwave tones to settle in or lock on" top>
-              <IconChevR size={18} color={t.faint} />
-            </Row>
-          </Pressable>
-          <Pressable onPress={() => router.push('/haptics-lab' as never)}>
-            <Row title="Haptics lab" sub="Feel each cue, pick the crisp ones">
-              <IconChevR size={18} color={t.faint} />
-            </Row>
-          </Pressable>
-        </Card>
-
-        <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 18, marginTop: 26, alignItems: 'center' }}>
+        <View
+          style={{
+            backgroundColor: t.surface,
+            borderWidth: 2,
+            borderColor: t.lineSoft,
+            borderRadius: 18,
+            padding: 18,
+            marginTop: 26,
+            alignItems: 'center',
+          }}
+        >
           <Text style={{ fontSize: 26 }}>🔥</Text>
           <Body size={14} color={t.muted} style={{ textAlign: 'center', marginTop: 8 }}>
             Free, forever.
           </Body>
-          <Display size={14} style={{ marginTop: 2 }}>Built by an ADHD brain, for ADHD brains</Display>
+          <Display size={14} style={{ marginTop: 2 }}>
+            Built by an ADHD brain, for ADHD brains
+          </Display>
         </View>
-
-        <HoldDelete />
       </ScrollView>
-
-      {/* custom accent picker (P17) — applies app-wide + persists via setAccent */}
-      <ColorPickerSheet
-        open={accentOpen}
-        initial={accent}
-        onClose={() => setAccentOpen(false)}
-        onPick={setAccent}
-      />
     </View>
   );
 }

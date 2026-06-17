@@ -3,7 +3,6 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_ROUTINES, Routine } from '@/data/defaults';
-import { buildDemoData } from '@/data/demo';
 import { addDays, dateKey, todayKey } from '@/lib/dates';
 import { occursOn, Repeat } from '@/lib/repeat';
 import type { ToneConfig } from '@/lib/tones';
@@ -36,6 +35,7 @@ export interface Settings {
   streaks: boolean; // streak counter + show-up strip
   streakNeverDies: boolean; // gaps pause the streak instead of breaking it
   theme: 'dark' | 'light' | 'system';
+  themeStyle?: 'ember' | 'neutral';
   clock: 'system' | '12' | '24'; // time display — 'system' follows the device's 12/24h setting
   remindersOn: boolean;
   reduceMotion: boolean; // calms pulsing/animated effects app-wide (also honors the OS setting)
@@ -104,7 +104,6 @@ interface FlintState {
   setPomodoro: (patch: Partial<PomodoroConfig>) => void;
   pushRecentColor: (hex: string) => void;
   resetAll: () => void; // wipe everything → back to a fresh install (Settings → Delete all data)
-  loadDemo: () => void; // seed believable routines/tasks/history (Settings → Demo)
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -115,6 +114,7 @@ const DEFAULT_SETTINGS: Settings = {
   streaks: true,
   streakNeverDies: true,
   theme: 'dark',
+  themeStyle: 'ember',
   clock: 'system',
   // opt-in: stays off until the user enables it (onboarding button / Settings →
   // Reminders), so no OS permission dialog fires while building the first routine.
@@ -337,9 +337,6 @@ export const useStore = create<FlintState>()(
       // hard reset: data fields back to defaults (onboarded → false flips the
       // navigator guard back to onboarding); persist overwrites storage with these
       resetAll: () => set({ ...freshData() }),
-
-      // shallow-merge the demo slice; settings/theme/accent stay as the user has them
-      loadDemo: () => set({ ...buildDemoData() }),
     }),
     {
       name: 'flint-v1',

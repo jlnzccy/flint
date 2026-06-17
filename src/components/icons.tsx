@@ -232,3 +232,52 @@ export const IconWaves = ({ size = 22, color }: IconProps) => (
     </G>
   </Svg>
 );
+
+export const IconScan = ({ size = 20, color }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M3 8V4.5A1.5 1.5 0 014.5 3H8M16 3h3.5A1.5 1.5 0 0121 4.5V8M3 16v3.5A1.5 1.5 0 004.5 21H8M16 21h3.5a1.5 1.5 0 001.5-1.5V16"
+      stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"
+    />
+    <Path d="M6 12h12" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+  </Svg>
+);
+
+export const IconQR = ({ size = 18, color }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={2} y={2} width={6} height={6} rx={1.2} stroke={color} strokeWidth={2.2} />
+    <Rect x={4} y={4} width={2} height={2} fill={color} />
+    
+    <Rect x={16} y={2} width={6} height={6} rx={1.2} stroke={color} strokeWidth={2.2} />
+    <Rect x={18} y={4} width={2} height={2} fill={color} />
+    
+    <Rect x={2} y={16} width={6} height={6} rx={1.2} stroke={color} strokeWidth={2.2} />
+    <Rect x={4} y={18} width={2} height={2} fill={color} />
+
+    <Rect x={10} y={3} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={10} y={7} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={14} y={9} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={18} y={9} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={10} y={13} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={14} y={13} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={18} y={13} width={2} height={2} fill={color} rx={0.5} />
+    
+    <Rect x={10} y={17} width={2} height={2} fill={color} rx={0.5} />
+    <Rect x={14} y={17} width={2} height={2} fill={color} rx={0.5} />
+  </Svg>
+);
+
+export const IconPlayCircle = ({ size = 32, color }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    {/* Outer circle outline */}
+    <Circle cx={16} cy={16} r={13.5} stroke={color} strokeWidth={2.8} />
+    {/* Filled play triangle with rounded corners */}
+    <Path
+      d="M12.5 10.5v11l9.5-5.5z"
+      fill={color}
+      stroke={color}
+      strokeWidth={3}
+      strokeLinejoin="round"
+    />
+  </Svg>
+);

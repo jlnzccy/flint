@@ -53,12 +53,12 @@ function HeatGrid() {
     return appDays[k] ? 1 : 0;
   };
 
-  const ROWS = 7; // weekdays Mon→Sun
+  const ROWS = 5; // weekdays Mon→Fri (removed 2 rows from the bottom)
   const GAP = 5;
   const target = 15; // aim for ~15px squares, then fit columns + size to fill exactly
   const cols = w > 0 ? Math.max(1, Math.floor((w + GAP) / (target + GAP))) : 0;
   const box = cols > 0 ? (w - (cols - 1) * GAP) / cols : target;
-  const radius = Math.round(box * 0.45);
+  const radius = Math.round(box * 0.25); // rounded squares
 
   const today = new Date();
   const todayK = dateKey(today);
@@ -105,7 +105,7 @@ function HeatGrid() {
   );
 }
 
-/* Last-7-days show-up strip (P5). Trailing 7 days oldest→today, one marker per day.
+/* This week's show-up strip starting on Sunday (P5).
    A check when ≥1 routine was finished that day; off days are a plain neutral dot —
    never an ✗ (quiet attendance, no shame). Today's weekday label is brought forward. */
 function WeekStrip() {
@@ -115,7 +115,9 @@ function WeekStrip() {
   const merged = useMemo(() => mergedHistory({ history, doneMap }), [history, doneMap]);
   const today = new Date();
   const todayK = dateKey(today);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -6 + i));
+  const dow = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const sun = addDays(today, -dow);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(sun, i));
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
       {days.map((d) => {
@@ -124,15 +126,15 @@ function WeekStrip() {
         const isToday = k === todayK;
         return (
           <View key={k} style={{ alignItems: 'center', gap: 8 }}>
-            <Body size={11.5} color={isToday ? t.muted : t.faint}>{DOW1[d.getDay()]}</Body>
+            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 11.5, color: isToday ? t.muted : t.faint }}>{DOW1[d.getDay()]}</Text>
             <View
               style={{
-                width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: done ? t.accent.soft : t.raised,
+                width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: done ? t.accent.main : t.raised,
                 borderWidth: 2, borderColor: done ? t.accent.main : t.lineSoft,
               }}
             >
-              {done ? <IconCheck size={16} color={t.accent.main} /> : null}
+              {done ? <IconCheck size={16} color={t.accent.ink} /> : null}
             </View>
           </View>
         );
@@ -195,8 +197,11 @@ export default function Insights() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Display size={30}>Insights</Display>
+        <Chip onPress={() => router.push('/calendar')} style={{ paddingVertical: 7, paddingHorizontal: 10 }}>
+          <IconCal size={16} color={t.muted} />
+        </Chip>
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
         {/* heat-grid fills the card width (V1); no header, no range toggle (V4) */}
@@ -204,15 +209,11 @@ export default function Insights() {
           <HeatGrid />
         </View>
 
-        {/* this-week show-up strip — own card under the heat-grid (P5); calendar jump
-            lives here now (V4), right-aligned beside the label */}
-        <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, marginTop: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <Label>This week</Label>
-            <Chip onPress={() => router.push('/calendar')} style={{ paddingVertical: 7, paddingHorizontal: 10 }}>
-              <IconCal size={16} color={t.muted} />
-            </Chip>
-          </View>
+        {/* this-week show-up strip — header pulled outside the card (P5) */}
+        <View style={{ marginTop: 24, marginBottom: 10 }}>
+          <Label>This week</Label>
+        </View>
+        <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16 }}>
           <WeekStrip />
         </View>
 

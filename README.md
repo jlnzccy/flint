@@ -44,4 +44,5 @@ npx tsc --noEmit
 
 ## License
 
-[MIT](LICENSE)
+[Proprietary License](LICENSE)
+
