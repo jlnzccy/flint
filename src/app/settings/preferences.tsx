@@ -8,7 +8,7 @@ import { IconChevL, IconPlus } from '@/components/icons';
 import { tapHaptic } from '@/lib/haptics';
 import { useToast } from '@/components/toast';
 import { Body, Display, Label, Segmented, Toggle } from '@/components/ui';
-import { ACCENT_CHOICES, hexDarken } from '@/theme/colors';
+import { ACCENT_CHOICES, hexDarken, inkOn } from '@/theme/colors';
 import { useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 import { CircleBtn } from '@/components/chunky';
@@ -119,15 +119,13 @@ export default function Preferences() {
                 style={{
                   width: 40, height: 40, borderRadius: 20,
                   backgroundColor: customAccent ? accent : t.raised,
-                  borderWidth: customAccent ? 3 : 2,
+                  borderWidth: 2,
                   borderColor: customAccent ? hexDarken(accent, 0.55) : t.line,
                   alignItems: 'center', justifyContent: 'center',
                   transform: [{ scale: customAccent ? 1.12 : 1 }],
                 }}
               >
-                {customAccent
-                  ? <View style={{ width: 15, height: 15, borderRadius: 8, backgroundColor: hexDarken(accent, 0.55) }} />
-                  : <IconPlus size={16} color={t.muted} />}
+                <IconPlus size={16} color={customAccent ? inkOn(accent) : t.muted} />
               </Pressable>
             </View>
 

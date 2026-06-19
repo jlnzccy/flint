@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from 'react';
-import { Dimensions, ScrollView, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Dimensions, ScrollView, Text, View, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
@@ -16,6 +16,7 @@ import { routineMin } from '@/data/defaults';
 import { serializeRoutine } from '@/lib/share';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
+import { tapHaptic } from '@/lib/haptics';
 
 const { width } = Dimensions.get('window');
 const TICKET_WIDTH = Math.min(width - 40, 360);
@@ -70,6 +71,12 @@ function SerratedBorder({ color, position }: { color: string; position: 'top' | 
   );
 }
 
+const fmtStepTime = (min: number, sec?: number) => {
+  if (!sec) return `${min}m`;
+  if (min === 0) return `${sec}s`;
+  return `${min}m ${sec}s`;
+};
+
 export default function ShareScreen() {
   const t = useTheme();
   const router = useRouter();
@@ -77,6 +84,7 @@ export default function ShareScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const viewShotRef = useRef<any>(null);
+  const [flipped, setFlipped] = useState(false);
 
   const custom = useStore((s) => s.custom);
   const overrides = useStore((s) => s.overrides);
@@ -122,7 +130,7 @@ export default function ShareScreen() {
     if (!viewShotRef.current) return;
     try {
       const uri = await viewShotRef.current.capture();
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status === 'granted') {
         await MediaLibrary.createAssetAsync(uri);
         toast('Saved to gallery');
@@ -155,8 +163,12 @@ export default function ShareScreen() {
           options={{ format: 'png', quality: 0.95 }}
           style={{ backgroundColor: t.bg, padding: 12, width: TICKET_WIDTH + 24, alignItems: 'center' }}
         >
-          {/* Main Ticket Stub Card Wrapper */}
-          <View style={{ width: TICKET_WIDTH, position: 'relative' }}>
+          {/* Main Ticket Stub Card Wrapper wrapped in Pressable to toggle flip */}
+          <Pressable 
+            onPressIn={() => tapHaptic()} 
+            onPress={() => setFlipped((f) => !f)} 
+            style={{ width: TICKET_WIDTH, position: 'relative' }}
+          >
             <View 
               style={{ 
                 width: TICKET_WIDTH, 
@@ -189,139 +201,158 @@ export default function ShareScreen() {
                   <StarIcon color={c.main} size={13} />
                 </View>
 
-                {/* Styled Header Badge */}
-                <View 
-                  style={{ 
-                    borderWidth: 2, 
-                    borderColor: c.main, 
-                    borderRadius: 6, 
-                    paddingVertical: 3, 
-                    paddingHorizontal: 10, 
-                    backgroundColor: c.soft, 
-                    marginBottom: 14 
-                  }}
-                >
-                  <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 10, color: c.main, textTransform: 'uppercase', letterSpacing: 1.2 }}>
-                    Flint Ticket
-                  </Text>
-                </View>
+                {!flipped ? (
+                  <>
+                    {/* Styled Header Badge */}
+                    <View 
+                      style={{ 
+                        borderWidth: 2, 
+                        borderColor: c.main, 
+                        borderRadius: 6, 
+                        paddingVertical: 3, 
+                        paddingHorizontal: 10, 
+                        backgroundColor: c.soft, 
+                        marginBottom: 14 
+                      }}
+                    >
+                      <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 10, color: c.main, textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                        Flint Ticket
+                      </Text>
+                    </View>
 
-                {/* Routine Emoji & Name Header */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', paddingHorizontal: 4 }}>
-                  <View 
-                    style={{ 
-                      width: 50, 
-                      height: 50, 
-                      borderRadius: 14, 
-                      backgroundColor: c.soft, 
-                      borderWidth: 2, 
-                      borderColor: c.main, 
-                      alignItems: 'center', 
-                      justifyContent: 'center' 
-                    }}
-                  >
-                    <Text style={{ fontSize: 28 }}>{routine.emoji}</Text>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Display size={18} style={{ color: t.text }} numberOfLines={1}>
-                      {routine.name}
-                    </Display>
-                    <Body size={12} color={t.muted}>
-                      {routine.steps.length} steps · {totalMin}m duration
-                    </Body>
-                  </View>
-                </View>
-
-                {/* Ticket stub perforations (Left & Right Cutouts) + Dashed divider */}
-                <View style={{ width: '100%', height: 20, justifyContent: 'center', marginVertical: 14, position: 'relative' }}>
-                  {/* Horizontal divider line */}
-                  <View style={{ borderStyle: 'dashed', borderWidth: 1, borderColor: t.line, borderRadius: 1, width: '100%', height: 0 }} />
-                  {/* Left side punch hole cutout */}
-                  <View 
-                    style={{ 
-                      position: 'absolute', 
-                      left: -32, 
-                      width: 22, 
-                      height: 22, 
-                      borderRadius: 11, 
-                      backgroundColor: t.bg, 
-                      borderWidth: 3, 
-                      borderColor: c.main 
-                    }} 
-                  />
-                  {/* Right side punch hole cutout */}
-                  <View 
-                    style={{ 
-                      position: 'absolute', 
-                      right: -32, 
-                      width: 22, 
-                      height: 22, 
-                      borderRadius: 11, 
-                      backgroundColor: t.bg, 
-                      borderWidth: 3, 
-                      borderColor: c.main 
-                    }} 
-                  />
-                </View>
-
-                {/* Routine checklist steps printout */}
-                <View style={{ width: '100%', paddingHorizontal: 4, gap: 8, marginBottom: 16 }}>
-                  <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 10, color: t.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>
-                    Routine Steps
-                  </Text>
-                  
-                  {routine.steps.slice(0, 4).map((step, idx) => (
-                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      {/* Styled checkbox box */}
+                    {/* Routine Emoji & Name Header */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', paddingHorizontal: 4 }}>
                       <View 
                         style={{ 
-                          width: 14, 
-                          height: 14, 
+                          width: 50, 
+                          height: 50, 
+                          borderRadius: 14, 
+                          backgroundColor: c.soft, 
                           borderWidth: 2, 
                           borderColor: c.main, 
-                          borderRadius: 3, 
-                          backgroundColor: t.raised, 
                           alignItems: 'center', 
                           justifyContent: 'center' 
                         }}
-                      />
-                      <Body size={13.5} style={{ flex: 1, fontFamily: 'BeVietnamPro_600SemiBold', color: t.text }} numberOfLines={1}>
-                        {step.t}
-                      </Body>
-                      <Body size={12} color={t.muted}>{step.min}m</Body>
+                      >
+                        <Text style={{ fontSize: 28 }}>{routine.emoji}</Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Display size={18} style={{ color: t.text }} numberOfLines={1}>
+                          {routine.name}
+                        </Display>
+                        <Body size={12} color={t.muted}>
+                          {routine.steps.length} steps · {totalMin}m duration
+                        </Body>
+                      </View>
                     </View>
-                  ))}
-                  
-                  {routine.steps.length > 4 && (
-                    <Body size={12} color={t.faint} style={{ marginLeft: 24, fontStyle: 'italic' }}>
-                      + {routine.steps.length - 4} more steps...
-                    </Body>
-                  )}
-                </View>
 
-                {/* QR Code Container */}
-                <View 
-                  style={{ 
-                    padding: 12, 
-                    backgroundColor: '#ffffff', 
-                    borderRadius: 16, 
-                    borderWidth: 3, 
-                    borderColor: c.main,
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 6,
-                    elevation: 3,
-                    marginVertical: 4,
-                  }}
-                >
-                  <QRCode
-                    value={qrPayload}
-                    size={160}
-                    backgroundColor="#ffffff"
-                    color="#000000"
-                  />
-                </View>
+                    {/* Ticket stub perforations (Left & Right Cutouts) + Dashed divider */}
+                    <View style={{ width: '100%', height: 20, justifyContent: 'center', marginVertical: 14, position: 'relative' }}>
+                      <View style={{ borderStyle: 'dashed', borderWidth: 1, borderColor: t.line, borderRadius: 1, width: '100%', height: 0 }} />
+                      <View style={{ position: 'absolute', left: -32, width: 22, height: 22, borderRadius: 11, backgroundColor: t.bg, borderWidth: 3, borderColor: c.main }} />
+                      <View style={{ position: 'absolute', right: -32, width: 22, height: 22, borderRadius: 11, backgroundColor: t.bg, borderWidth: 3, borderColor: c.main }} />
+                    </View>
+
+                    {/* Routine checklist steps printout */}
+                    <View style={{ width: '100%', paddingHorizontal: 4, gap: 8, marginBottom: 16 }}>
+                      <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 10, color: t.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>
+                        Routine Steps
+                      </Text>
+                      {routine.steps.slice(0, 4).map((step, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View style={{ width: 14, height: 14, borderWidth: 2, borderColor: c.main, borderRadius: 3, backgroundColor: t.raised }} />
+                          <Body size={13.5} style={{ flex: 1, fontFamily: 'BeVietnamPro_600SemiBold', color: t.text }} numberOfLines={1}>
+                            {step.t}
+                          </Body>
+                          <Body size={12} color={t.muted}>{fmtStepTime(step.min, step.sec)}</Body>
+                        </View>
+                      ))}
+                      {routine.steps.length > 4 && (
+                        <Body size={12} color={t.faint} style={{ marginLeft: 24, fontStyle: 'italic' }}>
+                          + {routine.steps.length - 4} more steps...
+                        </Body>
+                      )}
+                    </View>
+
+                    {/* QR Code Container */}
+                    <View 
+                      style={{ 
+                        padding: 12, 
+                        backgroundColor: '#ffffff', 
+                        borderRadius: 16, 
+                        borderWidth: 3, 
+                        borderColor: c.main,
+                        shadowColor: '#000000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 6,
+                        elevation: 3,
+                        marginVertical: 4,
+                      }}
+                    >
+                      <QRCode
+                        value={qrPayload}
+                        size={160}
+                        backgroundColor="#ffffff"
+                        color="#000000"
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    {/* Back Side */}
+                    <View 
+                      style={{ 
+                        borderWidth: 2, 
+                        borderColor: c.main, 
+                        borderRadius: 6, 
+                        paddingVertical: 3, 
+                        paddingHorizontal: 10, 
+                        backgroundColor: c.soft, 
+                        marginBottom: 14 
+                      }}
+                    >
+                      <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 10, color: c.main, textTransform: 'uppercase', letterSpacing: 1.2 }}>
+                        Admission Back
+                      </Text>
+                    </View>
+
+                    {/* Complete Steps List */}
+                    <View style={{ width: '100%', paddingHorizontal: 4, gap: 8, marginBottom: 16 }}>
+                      <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 10, color: t.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
+                        Complete Steps ({routine.steps.length})
+                      </Text>
+                      {routine.steps.map((step, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 }}>
+                          <View style={{ width: 14, height: 14, borderWidth: 2, borderColor: c.main, borderRadius: 3, backgroundColor: t.raised }} />
+                          <Body size={13.5} style={{ flex: 1, fontFamily: 'BeVietnamPro_600SemiBold', color: t.text }} numberOfLines={1}>
+                            {idx + 1}. {step.t}
+                          </Body>
+                          <Body size={12} color={t.muted}>{fmtStepTime(step.min, step.sec)}</Body>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Stamp or Arcade decoration */}
+                    <View 
+                      style={{ 
+                        marginVertical: 12, 
+                        borderWidth: 3, 
+                        borderColor: c.main, 
+                        borderStyle: 'dashed', 
+                        borderRadius: 12, 
+                        paddingVertical: 8, 
+                        paddingHorizontal: 20,
+                        transform: [{ rotate: '-4deg' }],
+                        opacity: 0.8
+                      }}
+                    >
+                      <Text style={{ fontFamily: 'Nunito_900Black', fontSize: 14, color: c.main, textTransform: 'uppercase', letterSpacing: 2 }}>
+                        ★ ADMIT ONE ★
+                      </Text>
+                    </View>
+                  </>
+                )}
 
                 {/* Barcode & serial at bottom */}
                 <Barcode 
@@ -331,7 +362,7 @@ export default function ShareScreen() {
                 />
 
                 <Body size={11} color={t.faint} style={{ textAlign: 'center', marginTop: 14, fontFamily: 'BeVietnamPro_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Sync in Flint app
+                  {flipped ? 'TAP TICKET TO FLIP FRONT' : 'Sync in Flint app'}
                 </Body>
 
               </View>
@@ -339,11 +370,16 @@ export default function ShareScreen() {
               {/* Bottom Serrated Edge */}
               <SerratedBorder color={t.bg} position="bottom" />
             </View>
-          </View>
+          </Pressable>
         </ViewShot>
 
+        {/* Flip Assist Visual Label */}
+        <Body size={12} color={t.faint} style={{ textAlign: 'center', marginTop: 4 }}>
+          Tap to flip 🔄
+        </Body>
+
         {/* Action Buttons (Properly aligned with TICKET_WIDTH) */}
-        <View style={{ width: TICKET_WIDTH, marginTop: 18, gap: 12 }}>
+        <View style={{ width: TICKET_WIDTH, marginTop: 14, gap: 12 }}>
           <ChunkyButton
             color={c.main}
             deep={c.deep}

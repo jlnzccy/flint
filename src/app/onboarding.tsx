@@ -88,10 +88,10 @@ export default function Onboarding() {
 
   const finish = (href?: string) => {
     if (href) {
-      // straight into the editor (still an unguarded route) *before* flipping onboarded,
-      // so Today never flashes between onboarding and building the first routine
-      router.replace(href as Parameters<typeof router.replace>[0]);
-      complete();
+      // push into the editor *before* flipping onboarded, so they can go back/cancel.
+      const separator = href.includes('?') ? '&' : '?';
+      const target = `${href}${separator}fromOnboarding=true`;
+      router.push(target as Parameters<typeof router.push>[0]);
     } else {
       // skip: flip onboarded → the navigator swaps onboarding out for Today
       complete();

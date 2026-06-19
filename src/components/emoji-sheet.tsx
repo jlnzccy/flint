@@ -64,15 +64,32 @@ export function EmojiSheet({ open, value, onClose, onPick }: Props) {
           style={{
             width: 58, height: 58, borderRadius: 16, backgroundColor: t.raised,
             borderWidth: 2, borderColor: t.accent.main, alignItems: 'center', justifyContent: 'center',
+            position: 'relative', overflow: 'hidden',
           }}
         >
+          <Text style={{ fontSize: 28, color: t.text }}>{typed}</Text>
           <TextInput
             ref={inputRef}
-            value={typed}
-            onChangeText={(v) => setTyped((cur) => cleanEmoji(v, cur))}
+            value=""
+            onChangeText={(v) => {
+              const cleaned = v.trim();
+              if (cleaned) {
+                setTyped(cleaned);
+              }
+            }}
             caretHidden
             autoCorrect={false}
-            style={{ width: '100%', height: '100%', textAlign: 'center', fontSize: 28, color: t.text, padding: 0 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              opacity: 0,
+              textAlign: 'center',
+              fontSize: 28,
+              padding: 0,
+            }}
           />
         </Pressable>
         <Body size={13} color={t.muted} style={{ flex: 1 }}>

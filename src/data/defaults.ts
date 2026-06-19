@@ -3,6 +3,7 @@ import { ColorName } from '@/theme/colors';
 export interface Step {
   t: string;
   min: number;
+  sec?: number;
   hint?: string;
 }
 
@@ -108,7 +109,10 @@ export const EMOJI_GROUPS: { name: string; emoji: string[] }[] = [
 ];
 export const COLOR_CHOICES: ColorName[] = ['accent', 'gold', 'teal', 'purple', 'green', 'rose'];
 
-export const routineMin = (r: Pick<Routine, 'steps'>): number => r.steps.reduce((a, s) => a + s.min, 0);
+export const routineMin = (r: Pick<Routine, 'steps'>): number => {
+  const totalSeconds = r.steps.reduce((a, s) => a + s.min * 60 + (s.sec ?? 0), 0);
+  return Math.ceil(totalSeconds / 60);
+};
 
 /* ── starter templates ──
    Blueprints the editor preloads when you tap a suggestion. Everything stays

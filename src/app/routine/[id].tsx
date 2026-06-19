@@ -10,7 +10,7 @@ import { IconBell, IconClock, IconDots, IconPencil, IconX, IconShare } from '@/c
 import { BottomSheet } from '@/components/sheet';
 import { useToast } from '@/components/toast';
 import { Body, Chip, Display, Label, StepperBtn, Toggle, useTimeFmt } from '@/components/ui';
-import { routineMin } from '@/data/defaults';
+import { routineMin, Step } from '@/data/defaults';
 import { addMins, nowHHMM } from '@/lib/dates';
 import { tapHaptic } from '@/lib/haptics';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
@@ -19,6 +19,17 @@ import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 import QRCode from 'react-native-qrcode-svg';
 import { serializeRoutine } from '@/lib/share';
+
+const fmtStepTimeLong = (min: number, sec?: number) => {
+  if (!sec) return `${min} min`;
+  if (min === 0) return `${sec} sec`;
+  return `${min} min ${sec} sec`;
+};
+
+const fmtStepSliceMin = (steps: Step[]) => {
+  const totalSec = steps.reduce((a, s) => a + s.min * 60 + (s.sec ?? 0), 0);
+  return Math.ceil(totalSec / 60);
+};
 
 export default function RoutineDetail() {
   const t = useTheme();
@@ -148,43 +159,13 @@ export default function RoutineDetail() {
                   <Body size={13} color={t.faint} style={{ marginTop: 2 }}>{s.hint}</Body>
                 ) : null}
               </View>
-              <Body size={13} color={t.faint}>{s.min} min</Body>
+              <Body size={13} color={t.faint}>{fmtStepTimeLong(s.min, s.sec)}</Body>
             </View>
           ))}
         </Animated.View>
         )}
 
-        {ready && (
-        <Animated.View entering={entrance(60)}>
-          <Label style={{ marginTop: 26, marginBottom: 8 }}>This routine</Label>
-          <View style={{ gap: 10 }}>
-            <View
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
-                backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Display size={15}>Auto-advance</Display>
-                <Body size={12} color={t.faint} style={{ marginTop: 2 }}>Move to the next step at zero.</Body>
-              </View>
-              <Toggle on={!!routine.autoAdvance} onChange={(v) => patch({ autoAdvance: v })} />
-            </View>
-            <View
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
-                backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Display size={15}>30-second warning</Display>
-                <Body size={12} color={t.faint} style={{ marginTop: 2 }}>A nudge before each step ends.</Body>
-              </View>
-              <Toggle on={!!routine.warn30} onChange={(v) => patch({ warn30: v })} />
-            </View>
-          </View>
-        </Animated.View>
-        )}
+
       </ScrollView>
 
       {/* bottom actions */}
@@ -248,6 +229,32 @@ export default function RoutineDetail() {
               </Text>
             </ChunkyButton>
           )}
+
+          <Label style={{ marginTop: 14, marginBottom: 4 }}>Options</Label>
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+              backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Display size={15}>Auto-advance</Display>
+              <Body size={12} color={t.faint} style={{ marginTop: 2 }}>Move to the next step at zero.</Body>
+            </View>
+            <Toggle on={!!routine.autoAdvance} onChange={(v) => patch({ autoAdvance: v })} />
+          </View>
+          <View
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+              backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Display size={15}>30-second warning</Display>
+              <Body size={12} color={t.faint} style={{ marginTop: 2 }}>A nudge before each step ends.</Body>
+            </View>
+            <Toggle on={!!routine.warn30} onChange={(v) => patch({ warn30: v })} />
+          </View>
         </View>
       </BottomSheet>
 
@@ -266,7 +273,7 @@ export default function RoutineDetail() {
             <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
               Just step one
             </Text>
-            <Body size={13} color={t.faint}>~{routine.steps[0].min} min</Body>
+            <Body size={13} color={t.faint}>~{fmtStepSliceMin([routine.steps[0]])} min</Body>
           </ChunkyButton>
           {[2, 3]
             .filter((n) => n < routine.steps.length)
@@ -284,7 +291,7 @@ export default function RoutineDetail() {
                 <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
                   First {n} steps
                 </Text>
-                <Body size={13} color={t.faint}>~{routine.steps.slice(0, n).reduce((a, s) => a + s.min, 0)} min</Body>
+                <Body size={13} color={t.faint}>~{fmtStepSliceMin(routine.steps.slice(0, n))} min</Body>
               </ChunkyButton>
             ))}
           <View
@@ -296,7 +303,7 @@ export default function RoutineDetail() {
             <Body size={15} style={{ flex: 1, fontFamily: 'BeVietnamPro_600SemiBold' }}>
               Custom: {customN} {customN === 1 ? 'step' : 'steps'}
             </Body>
-            <Body size={13} color={t.faint}>~{routine.steps.slice(0, customN).reduce((a, s) => a + s.min, 0)} min</Body>
+            <Body size={13} color={t.faint}>~{fmtStepSliceMin(routine.steps.slice(0, customN))} min</Body>
             <StepperBtn onPress={() => setCustomN((x) => Math.max(1, x - 1))} label="Fewer">−</StepperBtn>
             <StepperBtn onPress={() => setCustomN((x) => Math.min(routine.steps.length, x + 1))} label="More">+</StepperBtn>
           </View>

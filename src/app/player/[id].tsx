@@ -23,7 +23,7 @@ import { fmtSec } from '@/lib/dates';
 import { doneHaptic, finishHaptic, tapHaptic, warnHaptic } from '@/lib/haptics';
 import { cancelTimerAlert, scheduleTimerAlert } from '@/lib/notifications';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
-import { playCelebration, playStepDone } from '@/lib/sfx';
+import { playCelebration, playStepDone, playWarningChime } from '@/lib/sfx';
 import { resolveRoutines, useStore } from '@/state/store';
 import { routineOnDay } from '@/data/defaults';
 import { useTheme } from '@/theme/theme';
@@ -58,6 +58,14 @@ const HEADLINES = [
 ];
 
 const pickHeadline = () => HEADLINES[Math.floor(Math.random() * HEADLINES.length)];
+
+const fmtDurationLabel = (secVal: number) => {
+  const m = Math.floor(secVal / 60);
+  const s = secVal % 60;
+  if (m === 0) return `${s} sec`;
+  if (s === 0) return `${m} min`;
+  return `${m} min ${s} sec`;
+};
 
 /* Progress segment — animates its width + color as the step changes (M1). Honors
    reduce-motion: when calmed, the change snaps (duration 0). */
@@ -128,7 +136,7 @@ export default function Player() {
   const elapsedRef = useRef(0);
 
   const step = steps[idx];
-  const target = step ? step.min * 60 + extra : 60;
+  const target = step ? step.min * 60 + (step.sec ?? 0) + extra : 60;
 
   useEffect(() => {
     if (paused || phase !== 'play') return;
@@ -146,7 +154,10 @@ export default function Player() {
   // soft buzz. Works the same counting up or down (elapsed always counts up internally).
   useEffect(() => {
     if (phase !== 'play' || paused || !step || elapsed <= 0) return;
-    if (routine?.warn30 && target > 30 && elapsed === target - 30) warnHaptic();
+    if (routine?.warn30 && target > 30 && elapsed === target - 30) {
+      warnHaptic();
+      playWarningChime();
+    }
     if (elapsed === target) {
       if (routine?.autoAdvance) advance('done');
       else doneHaptic();
@@ -428,7 +439,7 @@ export default function Player() {
             style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }, checkStyle]}
           >
             <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: t.green.main, alignItems: 'center', justifyContent: 'center' }}>
-              <IconCheck size={50} color={t.green.ink} />
+              <IconCheck size={50} color="#ffffff" />
             </View>
           </Animated.View>
         </View>
@@ -436,7 +447,7 @@ export default function Player() {
         {/* how long this step is set for */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14 }}>
           <IconClock size={13} color={t.faint} />
-          <Label color={t.faint}>{`${step.min} min${extra ? ` +${extra / 60}` : ''}`}</Label>
+          <Label color={t.faint}>{fmtDurationLabel(step.min * 60 + (step.sec ?? 0) + extra)}</Label>
         </View>
 
         {/* next step — no number, more presence but still under the current step (T3) */}
@@ -510,7 +521,7 @@ export default function Player() {
             style={{ flex: 1 }}
             onPress={() => advance('done')}
           >
-            {redo ? <IconRestart size={18} color={c.ink} /> : <IconCheck size={18} color={c.ink} />}
+            {redo && <IconRestart size={18} color={c.ink} />}
             <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 18, color: c.ink, textTransform: 'uppercase', letterSpacing: 0.9 }}>
               {redo ? 'Do it again' : 'Done'}
             </Text>

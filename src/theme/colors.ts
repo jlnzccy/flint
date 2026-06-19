@@ -89,7 +89,15 @@ const STATIC_ACCENTS: Record<Exclude<ColorName, 'accent'>, AccentDef> = {
   rose: { main: '#e85d75', deep: '#a83a52', ink: '#f7f1e8' },
 };
 
-export const ACCENT_CHOICES = ['#ff6b35', '#ffb627', '#2ec4b6', '#a06cd5', '#6bc46d', '#e85d75'];
+export const ACCENT_CHOICES = [
+  '#1CB0F6', // Macaw (Blue)
+  '#FF4B4B', // Cardinal (Red)
+  '#FFC800', // Bee (Yellow)
+  '#FF9600', // Fox (Orange)
+  '#CE82FF', // Beetle (Purple)
+  '#2B70C9', // Humpback (Dark Blue)
+  '#58CC02'  // Feather Green (Green)
+];
 
 export interface ColorSet {
   main: string;

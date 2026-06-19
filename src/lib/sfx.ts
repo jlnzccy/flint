@@ -334,4 +334,16 @@ export function playStepDone(): void {
   fireWarm(stepDonePlayer);
 }
 
+/* Play a pleasant double-beep retro warning chime when 30 seconds remain. */
+export async function playWarningChime(): Promise<void> {
+  try {
+    await playChiptune([
+      [
+        { time: 0.00, dur: 0.08, freq: 880, type: 'square', vol: 0.06 },
+        { time: 0.12, dur: 0.08, freq: 1109.73, type: 'square', vol: 0.06 }
+      ]
+    ]);
+  } catch {}
+}
+
 

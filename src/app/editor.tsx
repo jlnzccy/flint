@@ -10,7 +10,7 @@ import { DragList } from '@/components/drag-list';
 import { warmCelebrationAssets } from '@/components/emoji-confetti';
 import { EmojiSheet } from '@/components/emoji-sheet';
 import { IconAlarm, IconArchive, IconBell, IconChevR, IconPlus, IconRestart, IconTrash, IconX } from '@/components/icons';
-import { MinutePicker } from '@/components/minute-picker';
+import { MinutePicker, WheelPicker } from '@/components/minute-picker';
 import { BottomSheet } from '@/components/sheet';
 import { Slider } from '@/components/slider';
 import { TimePicker } from '@/components/time-picker';
@@ -21,6 +21,7 @@ import { confirmDestructive } from '@/lib/confirm';
 import { tapHaptic } from '@/lib/haptics';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
+import { hexDarken } from '@/theme/colors';
 
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday-first
 const DAY_LABELS: Record<number, string> = { 0: 'S', 1: 'M', 2: 'T', 3: 'W', 4: 'T', 5: 'F', 6: 'S' };
@@ -28,25 +29,40 @@ const DAY_LABELS: Record<number, string> = { 0: 'S', 1: 'M', 2: 'T', 3: 'W', 4: 
 interface DraftStep {
   t: string;
   min: number;
+  sec: number;
   hint: string;
   _k: string;
 }
 
-/* Pomodoro config row: label + live value + a swipe slider (W3). */
-function PomoSliderRow({
-  label, sub, value, unit, min, max, step, color, onChange,
-}: { label: string; sub?: string; value: number; unit?: string; min: number; max: number; step: number; color: string; onChange: (v: number) => void }) {
+const fmtStepTimeShort = (min: number, sec: number) => {
+  if (min === 0) return `${sec}s`;
+  if (sec === 0) return `${min}m`;
+  return `${min}m ${sec}s`;
+};
+
+/* Pomodoro config row: label + WheelPicker for selecting numbers. */
+function PomoWheelRow({
+  label, sub, value, options, unit, onChange,
+}: {
+  label: string;
+  sub?: string;
+  value: number;
+  options: number[];
+  unit: string;
+  onChange: (v: number) => void;
+}) {
   const t = useTheme();
   return (
-    <View style={{ gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ flex: 1 }}>
           <Body size={15} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
           {sub ? <Body size={12} color={t.faint} style={{ marginTop: 1 }}>{sub}</Body> : null}
         </View>
-        <Display size={16}>{unit ? `${value} ${unit}` : value}</Display>
       </View>
-      <Slider value={value} min={min} max={max} step={step} color={color} onChange={onChange} />
+      <View style={{ height: 56, marginTop: 4 }}>
+        <WheelPicker value={value} options={options} unit={unit} onChange={onChange} />
+      </View>
     </View>
   );
 }
@@ -57,7 +73,13 @@ export default function Editor() {
   const toast = useToast();
   const fmtT = useTimeFmt();
   const insets = useSafeAreaInsets();
-  const { id, focusStep, template, pick } = useLocalSearchParams<{ id?: string; focusStep?: string; template?: string; pick?: string }>();
+  const { id, focusStep, template, pick, fromOnboarding } = useLocalSearchParams<{
+    id?: string;
+    focusStep?: string;
+    template?: string;
+    pick?: string;
+    fromOnboarding?: string;
+  }>();
 
   const routine = useMemo(() => {
     if (!id) return null;
@@ -86,8 +108,8 @@ export default function Editor() {
   const [color, setColor] = useState<string>(seed?.color ?? COLOR_CHOICES[0]);
   const [steps, setSteps] = useState<DraftStep[]>(() =>
     seedSteps && seedSteps.length
-      ? seedSteps.map((s, i) => ({ t: s.t, min: s.min, hint: s.hint ?? '', _k: 'k' + i }))
-      : [{ t: '', min: 2, hint: '', _k: 'k0' }]
+      ? seedSteps.map((s, i) => ({ t: s.t, min: s.min, sec: s.sec ?? 0, hint: s.hint ?? '', _k: 'k' + i }))
+      : [{ t: '', min: 2, sec: 0, hint: '', _k: 'k0' }]
   );
   // new blank routines default to a scheduled time — anytime is the opt-out
   const [reminder, setReminder] = useState<string | null>(
@@ -116,7 +138,7 @@ export default function Editor() {
     if (!pomo) return;
     const next = { ...pomo, ...patch };
     setPomo(next);
-    setSteps(buildPomodoroSteps(next).map((s, i) => ({ t: s.t, min: s.min, hint: s.hint ?? '', _k: 'k' + i })));
+    setSteps(buildPomodoroSteps(next).map((s, i) => ({ t: s.t, min: s.min, sec: s.sec ?? 0, hint: s.hint ?? '', _k: 'k' + i })));
   };
 
   const customColor = !COLOR_CHOICES.includes(color as any);
@@ -134,7 +156,7 @@ export default function Editor() {
   // new steps open their sheet straight away so there's somewhere to name them
   const addStep = () => {
     const k = 'k' + kRef.current++;
-    setSteps((s) => [...s, { t: '', min: 2, hint: '', _k: k }]);
+    setSteps((s) => [...s, { t: '', min: 2, sec: 0, hint: '', _k: k }]);
     setEditKey(k);
   };
   const delStep = (k: string) => setSteps((s) => s.filter((x) => x._k !== k));
@@ -162,7 +184,7 @@ export default function Editor() {
       alarm,
       alarmUri,
       days: [...days].sort(),
-      steps: steps.map((s) => ({ t: s.t.trim(), min: s.min, hint: s.hint.trim() })),
+      steps: steps.map((s) => ({ t: s.t.trim(), min: s.min, sec: s.sec, hint: s.hint.trim() })),
       pomo,
     });
   const baseline = useRef<string | null>(null);
@@ -226,7 +248,12 @@ export default function Editor() {
       reminder,
       alarm: reminder ? alarm : false,
       days: days.length === 7 ? undefined : [...days].sort(),
-      steps: steps.filter((s) => s.t.trim()).map((s) => ({ t: s.t.trim(), min: s.min, hint: s.hint.trim() || undefined })),
+      steps: steps.filter((s) => s.t.trim()).map((s) => ({
+        t: s.t.trim(),
+        min: s.min,
+        sec: s.sec > 0 ? s.sec : undefined,
+        hint: s.hint.trim() || undefined
+      })),
       alarmRingtoneUri: reminder && alarm ? alarmUri : null,
       // pomodoro routines auto-advance through breaks; carry the config + flag (W1)
       pomodoro: isPomo && pomo ? pomo : undefined,
@@ -238,15 +265,24 @@ export default function Editor() {
     st.saveRoutine(r);
     // warm the celebration lottie pool (idle) so the first party isn't sparse (QoL3)
     InteractionManager.runAfterInteractions(() => warmCelebrationAssets());
-    if (firstEver) {
-      // the one-time first-routine party. Raise the full-screen overlay (rendered at the
-      // app root) before navigating, so the user lands on it — never a flash of Today.
-      st.markFirstCelebrated();
-      st.setShowCelebration(true);
-      safeBack();
+    if (fromOnboarding === 'true') {
+      st.completeOnboarding();
+      if (firstEver) {
+        st.markFirstCelebrated();
+        st.setShowCelebration(true);
+      }
+      router.replace('/(tabs)');
     } else {
-      toast('Saved');
-      safeBack();
+      if (firstEver) {
+        // the one-time first-routine party. Raise the full-screen overlay (rendered at the
+        // app root) before navigating, so the user lands on it — never a flash of Today.
+        st.markFirstCelebrated();
+        st.setShowCelebration(true);
+        safeBack();
+      } else {
+        toast('Saved');
+        safeBack();
+      }
     }
   };
 
@@ -322,19 +358,30 @@ export default function Editor() {
 
         <Label style={{ marginTop: 20, marginBottom: 8 }}>Color</Label>
         <View style={{ flexDirection: 'row', gap: 12, rowGap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {COLOR_CHOICES.map((cn) => (
-            <Pressable
-              key={cn}
-              accessibilityLabel={cn}
-              onPressIn={() => tapHaptic()}
-              onPress={() => setColor(cn)}
-              style={{
-                width: 40, height: 40, borderRadius: 20, backgroundColor: t.col(cn).main,
-                borderWidth: 3, borderColor: cn === color ? t.text : 'transparent',
-                transform: [{ scale: cn === color ? 1.12 : 1 }],
-              }}
-            />
-          ))}
+          {COLOR_CHOICES.map((cn) => {
+            const active = cn === color;
+            const swatchColor = t.col(cn).main;
+            const dark = hexDarken(swatchColor, 0.55);
+            return (
+              <Pressable
+                key={cn}
+                accessibilityLabel={cn}
+                onPressIn={() => tapHaptic()}
+                onPress={() => setColor(cn)}
+                style={{
+                  width: 40, height: 40, borderRadius: 20, backgroundColor: swatchColor,
+                  borderWidth: active ? 2.5 : 1.5,
+                  borderColor: active ? dark : t.line,
+                  alignItems: 'center', justifyContent: 'center',
+                  transform: [{ scale: active ? 1.12 : 1 }],
+                }}
+              >
+                {active && (
+                  <View style={{ width: 15, height: 15, borderRadius: 8, backgroundColor: dark }} />
+                )}
+              </Pressable>
+            );
+          })}
           {/* one fixed trailing slot: shows the chosen custom color (re-opens picker) or "+".
               recoloring in place means picking a custom color never reflows the row */}
           <Pressable
@@ -344,13 +391,13 @@ export default function Editor() {
             style={{
               width: 40, height: 40, borderRadius: 20,
               backgroundColor: customColor ? c.main : t.raised,
-              borderWidth: customColor ? 3 : 2,
-              borderColor: customColor ? t.text : t.line,
+              borderWidth: 2,
+              borderColor: customColor ? hexDarken(c.main, 0.55) : t.line,
               alignItems: 'center', justifyContent: 'center',
               transform: [{ scale: customColor ? 1.12 : 1 }],
             }}
           >
-            {customColor ? null : <IconPlus size={16} color={t.muted} />}
+            <IconPlus size={16} color={customColor ? c.ink : t.muted} />
           </Pressable>
         </View>
           </>
@@ -468,13 +515,13 @@ export default function Editor() {
         {isPomo && pomo ? (
           /* Pomodoro: sliders regenerate the focus/break steps; no manual list (W3) */
           <>
-            <Label style={{ marginTop: 22, marginBottom: 8 }}>Pomodoro</Label>
-            <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, gap: 18 }}>
-              <PomoSliderRow label="Sessions" sub="focus blocks" value={pomo.sessions} min={2} max={8} step={1} color={c.main} onChange={(v) => setPomoField({ sessions: v })} />
-              <PomoSliderRow label="Focus" value={pomo.focusMin} unit="min" min={5} max={60} step={5} color={c.main} onChange={(v) => setPomoField({ focusMin: v })} />
-              <PomoSliderRow label="Short break" value={pomo.breakMin} unit="min" min={1} max={20} step={1} color={c.main} onChange={(v) => setPomoField({ breakMin: v })} />
-              <PomoSliderRow label="Long break" sub={`after every ${pomo.longEvery} focus`} value={pomo.longBreakMin} unit="min" min={5} max={45} step={5} color={c.main} onChange={(v) => setPomoField({ longBreakMin: v })} />
-            </View>
+             <Label style={{ marginTop: 22, marginBottom: 8 }}>Pomodoro</Label>
+             <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, gap: 18 }}>
+               <PomoWheelRow label="Sessions" sub="focus blocks" value={pomo.sessions} options={Array.from({ length: 7 }, (_, i) => i + 2)} unit="sets" onChange={(v) => setPomoField({ sessions: v })} />
+               <PomoWheelRow label="Focus" value={pomo.focusMin} options={Array.from({ length: 12 }, (_, i) => (i + 1) * 5)} unit="min" onChange={(v) => setPomoField({ focusMin: v })} />
+               <PomoWheelRow label="Short break" value={pomo.breakMin} options={Array.from({ length: 20 }, (_, i) => i + 1)} unit="min" onChange={(v) => setPomoField({ breakMin: v })} />
+               <PomoWheelRow label="Long break" sub={`after every ${pomo.longEvery} focus`} value={pomo.longBreakMin} options={Array.from({ length: 9 }, (_, i) => (i + 1) * 5)} unit="min" onChange={(v) => setPomoField({ longBreakMin: v })} />
+             </View>
             <Body size={12} color={t.faint} style={{ marginTop: 10, textAlign: 'center' }}>
               {steps.filter((s) => s.t === 'Focus').length} focus · {steps.filter((s) => s.t !== 'Focus').length} break{steps.filter((s) => s.t !== 'Focus').length === 1 ? '' : 's'} · {routineMin({ steps })} min total
             </Body>
@@ -516,7 +563,7 @@ export default function Editor() {
                     <Body size={12} color={t.faint} numberOfLines={1} style={{ marginTop: 1 }}>{s.hint}</Body>
                   ) : null}
                 </View>
-                <Label color={t.muted}>{s.min}m</Label>
+                <Label color={t.muted}>{fmtStepTimeShort(s.min, s.sec)}</Label>
                 <IconChevR size={16} color={t.faint} />
               </Pressable>
             </View>
@@ -642,7 +689,20 @@ export default function Editor() {
             />
 
             <Label style={{ marginTop: 20, marginBottom: 12 }}>Time</Label>
-            <MinutePicker key={editStep._k} value={editStep.min} onChange={(m) => setStep(editStep._k, { min: m })} />
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <WheelPicker
+                value={editStep.min}
+                options={Array.from({ length: 91 }, (_, i) => i)} // 0 to 90
+                unit="min"
+                onChange={(m) => setStep(editStep._k, { min: m })}
+              />
+              <WheelPicker
+                value={editStep.sec}
+                options={Array.from({ length: 12 }, (_, i) => i * 5)} // 0 to 55, step 5
+                unit="sec"
+                onChange={(s) => setStep(editStep._k, { sec: s })}
+              />
+            </View>
 
             {steps.length > 1 && (
               <ChunkyButton

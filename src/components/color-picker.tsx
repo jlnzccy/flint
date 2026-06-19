@@ -30,9 +30,13 @@ function Track({
     [colorAt]
   );
 
+  const R = 13;
+
   // keep the thumb synced to the value when the change came from outside a drag
   useEffect(() => {
-    if (!draggingRef.current) tx.value = value * w;
+    if (!draggingRef.current && w > 0) {
+      tx.value = R + value * (w - 2 * R);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, w]);
 
@@ -46,15 +50,15 @@ function Track({
     .onBegin((e) => {
       if (wSv.value <= 0) return;
       runOnJS(setDragging)(true);
-      const x = Math.min(wSv.value, Math.max(0, e.x));
+      const x = Math.min(wSv.value - R, Math.max(R, e.x));
       tx.value = x;
-      runOnJS(commit)(x / wSv.value);
+      runOnJS(commit)((x - R) / (wSv.value - 2 * R));
     })
     .onUpdate((e) => {
       if (wSv.value <= 0) return;
-      const x = Math.min(wSv.value, Math.max(0, e.x));
+      const x = Math.min(wSv.value - R, Math.max(R, e.x));
       tx.value = x;
-      runOnJS(commit)(x / wSv.value);
+      runOnJS(commit)((x - R) / (wSv.value - 2 * R));
     })
     .onFinalize(() => runOnJS(setDragging)(false));
 
@@ -68,7 +72,7 @@ function Track({
           const width = e.nativeEvent.layout.width;
           setW(width);
           wSv.value = width;
-          if (!draggingRef.current) tx.value = value * width;
+          if (!draggingRef.current) tx.value = R + value * (width - 2 * R);
         }}
         style={{ height: 36, justifyContent: 'center' }}
       >

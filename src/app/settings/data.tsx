@@ -10,7 +10,8 @@ import { useToast } from '@/components/toast';
 import { Body, Display, Label } from '@/components/ui';
 import { useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
-import { CircleBtn } from '@/components/chunky';
+import { ChunkyButton, CircleBtn } from '@/components/chunky';
+import { BottomSheet } from '@/components/sheet';
 
 const HOLD_MS = 1500;
 
@@ -56,7 +57,7 @@ function HoldDelete() {
         onPressOut={cancel}
         accessibilityLabel="Hold to delete all data"
         style={{
-          marginTop: 26, height: 56, borderRadius: 18, overflow: 'hidden',
+          marginTop: 12, height: 56, borderRadius: 18, overflow: 'hidden',
           borderWidth: 2, borderColor: t.accent.main, backgroundColor: t.surface,
           flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}
@@ -81,6 +82,7 @@ export default function DataScreen() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
@@ -96,8 +98,27 @@ export default function DataScreen() {
         </Body>
 
         <Label style={{ marginTop: 22, marginBottom: 8 }}>Danger Zone</Label>
-        <HoldDelete />
+        <ChunkyButton
+          color={t.accent.main}
+          deep={t.accent.deep}
+          ink={t.accent.ink}
+          fontSize={14}
+          pad={[13, 18]}
+          onPress={() => setSheetOpen(true)}
+          style={{ marginTop: 8 }}
+        >
+          Delete all data
+        </ChunkyButton>
       </ScrollView>
+
+      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Delete all data" scroll={false}>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
+          <Body size={14} color={t.text} style={{ lineHeight: 20, marginBottom: 12 }}>
+            This will permanently delete all routines, tasks, history, and settings. This action cannot be undone.
+          </Body>
+          <HoldDelete />
+        </View>
+      </BottomSheet>
     </View>
   );
 }

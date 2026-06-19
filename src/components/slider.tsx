@@ -31,9 +31,13 @@ export function Slider({ value, min, max, step = 1, color, onChange }: SliderPro
   const lastRef = useRef(value);
   lastRef.current = value;
 
+  const R = THUMB / 2;
+
   // keep the thumb synced when the value changes from outside a drag
   useEffect(() => {
-    if (!draggingRef.current && w > 0) tx.value = ((value - min) / (max - min)) * w;
+    if (!draggingRef.current && w > 0) {
+      tx.value = R + ((value - min) / (max - min)) * (w - 2 * R);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, w, min, max]);
 
@@ -56,15 +60,15 @@ export function Slider({ value, min, max, step = 1, color, onChange }: SliderPro
     .onBegin((e) => {
       if (wSv.value <= 0) return;
       runOnJS(setDragging)(true);
-      const x = Math.min(wSv.value, Math.max(0, e.x));
+      const x = Math.min(wSv.value - R, Math.max(R, e.x));
       tx.value = x;
-      runOnJS(commit)(x / wSv.value);
+      runOnJS(commit)((x - R) / (wSv.value - 2 * R));
     })
     .onUpdate((e) => {
       if (wSv.value <= 0) return;
-      const x = Math.min(wSv.value, Math.max(0, e.x));
+      const x = Math.min(wSv.value - R, Math.max(R, e.x));
       tx.value = x;
-      runOnJS(commit)(x / wSv.value);
+      runOnJS(commit)((x - R) / (wSv.value - 2 * R));
     })
     .onFinalize(() => runOnJS(setDragging)(false));
 
@@ -79,7 +83,7 @@ export function Slider({ value, min, max, step = 1, color, onChange }: SliderPro
           const width = e.nativeEvent.layout.width;
           setW(width);
           wSv.value = width;
-          if (!draggingRef.current) tx.value = ((value - min) / (max - min)) * width;
+          if (!draggingRef.current) tx.value = R + ((value - min) / (max - min)) * (width - 2 * R);
         }}
         style={{ height: 40, justifyContent: 'center' }}
       >
