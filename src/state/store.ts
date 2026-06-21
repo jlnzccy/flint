@@ -35,10 +35,12 @@ export interface Settings {
   streaks: boolean; // streak counter + show-up strip
   streakNeverDies: boolean; // gaps pause the streak instead of breaking it
   theme: 'dark' | 'light' | 'system';
-  themeStyle?: 'ember' | 'neutral';
+  themeStyle?: 'ember' | 'neutral' | 'material' | 'wallpaper';
+  materialProfile?: 'spot' | 'vibrant' | 'expressive' | 'muted';
   clock: 'system' | '12' | '24'; // time display — 'system' follows the device's 12/24h setting
   remindersOn: boolean;
   reduceMotion: boolean; // calms pulsing/animated effects app-wide (also honors the OS setting)
+  todayView: 'list' | 'timeline';
 }
 
 /* Pomodoro mode on the Timer screen. ADHD-tuned: everything is user-controlled —
@@ -115,12 +117,14 @@ const DEFAULT_SETTINGS: Settings = {
   streakNeverDies: true,
   theme: 'dark',
   themeStyle: 'ember',
+  materialProfile: 'spot',
   clock: 'system',
   // opt-in: stays off until the user enables it (onboarding button / Settings →
   // Reminders), so no OS permission dialog fires while building the first routine.
   // Existing users keep their stored value — persist replaces this default wholesale.
   remindersOn: false,
   reduceMotion: false,
+  todayView: 'list',
 };
 
 const DEFAULT_POMODORO: PomodoroConfig = {
@@ -340,7 +344,7 @@ export const useStore = create<FlintState>()(
     }),
     {
       name: 'flint-v1',
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: (persisted: any, version) => {
         if (version < 2 && persisted) {
@@ -406,6 +410,11 @@ export const useStore = create<FlintState>()(
           // Pomodoro config is new — backfill the whole object (it's persisted
           // standalone, so a missing field would read undefined at every call site)
           persisted.pomodoro = persisted.pomodoro ?? { ...DEFAULT_POMODORO };
+        }
+        if (version < 10 && persisted) {
+          if (persisted.settings) {
+            persisted.settings.todayView = persisted.settings.todayView ?? 'list';
+          }
         }
         return persisted;
       },

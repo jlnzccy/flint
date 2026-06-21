@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
-import { IconAlarm, IconArchive, IconBell, IconCheck, IconPencil, IconPlay, IconPlus, IconShare, IconTrash } from '@/components/icons';
+import { IconAlarm, IconArchive, IconBell, IconCheck, IconDrag, IconPencil, IconPlay, IconPlus, IconShare, IconTrash } from '@/components/icons';
 import { BottomSheet } from '@/components/sheet';
 import { Body, Chip, Display, EmojiTile, Label, useTimeFmt } from '@/components/ui';
 import { Routine, routineMin } from '@/data/defaults';
@@ -123,10 +123,11 @@ interface PreviewSheetProps {
   onArchive: (r: Routine) => void;
   onDelete: (r: Routine) => void;
   onPreviewAlarm: (r: Routine) => void;
+  onReorder?: () => void;
 }
 
 export function PreviewSheet({
-  routine, done, bumped, onClose, onOpen, onStartOne, onMarkDone, onEdit, onDuplicate, onShare, onBump, onUnbump, onArchive, onDelete, onPreviewAlarm,
+  routine, done, bumped, onClose, onOpen, onStartOne, onMarkDone, onEdit, onDuplicate, onShare, onBump, onUnbump, onArchive, onDelete, onPreviewAlarm, onReorder,
 }: PreviewSheetProps) {
   const t = useTheme();
   const fmtT = useTimeFmt();
@@ -183,6 +184,12 @@ export function PreviewSheet({
           <IconPencil size={14} color={t.text} />
           <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>Edit</Text>
         </Chip>
+        {onReorder && (
+          <Chip onPress={act(onReorder)}>
+            <IconDrag size={14} color={t.text} />
+            <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>Reorder</Text>
+          </Chip>
+        )}
         <Chip onPress={act(onDuplicate)}>
           <IconPlus size={14} color={t.text} />
           <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.text }}>Duplicate</Text>

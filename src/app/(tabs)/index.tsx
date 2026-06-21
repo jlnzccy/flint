@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, Keyframe, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, ChunkyCard } from '@/components/chunky';
-import { IconArchive, IconCal, IconDots, IconDrag, IconPlus } from '@/components/icons';
+import { IconCal, IconClock, IconList } from '@/components/icons';
 import { NewRoutineSheet } from '@/components/new-routine-sheet';
 import { PreviewSheet, RoutineCard } from '@/components/routine-bits';
+import { TodoRow } from '@/components/todo-row';
+import { Timeline } from '@/components/timeline';
 import { BottomSheet } from '@/components/sheet';
 import { DragList } from '@/components/drag-list';
 import { useToast } from '@/components/toast';
@@ -17,7 +19,8 @@ import { Routine, routineOnDay } from '@/data/defaults';
 import { confirmDestructive } from '@/lib/confirm';
 import { addDays, dateKey, greetingNow, keyToDate, minsUntil, todayKey } from '@/lib/dates';
 import { finishHaptic, tapHaptic } from '@/lib/haptics';
-import { mergedHistory, resolveRoutines, streakOf, useStore } from '@/state/store';
+import { buildAgenda, AgendaItem } from '@/lib/agenda';
+import { mergedHistory, resolveRoutines, streakOf, useStore, todoDoneOn, todoIsToday } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 
 const SWIPE = 48; // px of horizontal drag before the day flips
@@ -66,7 +69,8 @@ export default function TodayScreen() {
   const bumped = useStore((s) => s.bumped);
   const history = useStore((s) => s.history);
   const settings = useStore((s) => s.settings);
-  const { markDone, bump, unbump, archiveRoutine, deleteRoutine, restoreRoutine, reorder, duplicateRoutine } = useStore.getState();
+  const todos = useStore((s) => s.todos);
+  const { markDone, bump, unbump, archiveRoutine, deleteRoutine, restoreRoutine, reorder, duplicateRoutine, setSettings } = useStore.getState();
 
   const routines = useMemo(
     () => resolveRoutines({ custom, overrides, order, archived, deleted }),
@@ -75,9 +79,8 @@ export default function TodayScreen() {
 
   const [preview, setPreview] = useState<Routine | null>(null);
   const [reordering, setReordering] = useState(false);
-  const [archOpen, setArchOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
 
   // which day is on screen — defaults to today; pager looks ahead/behind
@@ -119,35 +122,45 @@ export default function TodayScreen() {
     return () => clearInterval(id);
   }, []);
 
-  // ── today (interactive) ──
-  const todayRoutines = routines.filter((r) => routineOnDay(r));
-  const open = todayRoutines.filter((r) => !doneMap[r.id]);
-  const scheduled = open.filter((r) => r.reminder).sort((a, b) => a.reminder!.localeCompare(b.reminder!));
-  const flexible = open.filter((r) => !r.reminder);
-  const completed = todayRoutines.filter((r) => doneMap[r.id]);
+  // ── agenda (interactive / preview) ──
+  const agenda = useMemo(() => {
+    return buildAgenda(
+      viewKey,
+      routines,
+      todos,
+      (item) => {
+        if (item.kind === 'routine') {
+          return isToday ? !!doneMap[item.id] : !!(history[viewKey] || []).includes(item.id);
+        } else {
+          const todo = todos.find((x) => x.id === item.id);
+          return todo ? todoDoneOn(todo, viewKey) : false;
+        }
+      }
+    );
+  }, [viewKey, routines, todos, doneMap, history, isToday]);
+
+  const scheduled = agenda.timed.filter((item) => !item.done);
+  const flexible = agenda.anytime.filter((item) => !item.done);
+  const completed = [...agenda.timed, ...agenda.anytime].filter((item) => item.done);
 
   // time-blindness anchor: the next scheduled thing still ahead of now
-  const nextUp = scheduled.filter((r) => !bumped[r.id]).find((r) => minsUntil(r.reminder) > 0);
-  const nextMins = nextUp ? minsUntil(nextUp.reminder) : 0;
+  const nextUp = agenda.timed
+    .filter((item) => !item.done && (item.kind === 'task' || !bumped[item.id]))
+    .find((item) => minsUntil(item.time) > 0);
+  const nextMins = nextUp ? minsUntil(nextUp.time) : 0;
   const nextWhen = nextMins >= 60 ? `${Math.floor(nextMins / 60)}h ${nextMins % 60}m` : `${nextMins}m`;
 
   // ── another day (read-only preview) ──
-  const dayRoutines = useMemo(() => routines.filter((r) => routineOnDay(r, dow)), [routines, dow]);
-  const dayDone = useMemo(() => (isPast ? new Set(history[viewKey] || []) : new Set<string>()), [isPast, history, viewKey]);
-  const dayScheduled = dayRoutines.filter((r) => r.reminder).sort((a, b) => a.reminder!.localeCompare(b.reminder!));
-  const dayFlexible = dayRoutines.filter((r) => !r.reminder);
-  const dayDoneCount = dayRoutines.filter((r) => dayDone.has(r.id)).length;
+  const dayScheduled = agenda.timed;
+  const dayFlexible = agenda.anytime;
+  const totalCount = agenda.timed.length + agenda.anytime.length;
+  const doneCount = [...agenda.timed, ...agenda.anytime].filter((x) => x.done).length;
 
   const merged = useMemo(() => mergedHistory({ history, doneMap }), [history, doneMap]);
   const streak = useMemo(
     () => (settings.streaks ? streakOf(merged, settings.streakNeverDies) : 0),
     [settings.streaks, settings.streakNeverDies, merged]
   );
-
-  const archivedList = useMemo(() => {
-    const all = resolveRoutines({ custom, overrides, order, archived: [], deleted });
-    return archived.map((id) => all.find((r) => r.id === id)).filter(Boolean) as Routine[];
-  }, [custom, overrides, order, archived, deleted]);
 
   const confirmDelete = (r: Routine, after?: () => void) =>
     confirmDestructive('Delete routine?', `"${r.name}" and its history stay gone.`, 'Delete', () => {
@@ -156,238 +169,339 @@ export default function TodayScreen() {
       after?.();
     });
 
-  const renderCards = (list: Routine[]) => (
+  const renderCards = (list: AgendaItem[]) => (
     <View style={{ gap: 12 }}>
-      {list.map((r) => (
-        <RoutineCard
-          key={r.id}
-          routine={r}
-          done={doneMap[r.id]}
-          bumped={bumped[r.id]}
-          remindersOn={settings.remindersOn}
-          onPress={() => router.push(`/routine/${r.id}`)}
-          onLongPress={() => {
-            tapHaptic();
-            setPreview(r);
-          }}
-        />
-      ))}
+      {list.map((item) => {
+        if (item.kind === 'routine') {
+          const r = routines.find((x) => x.id === item.id);
+          if (!r) return null;
+          return (
+            <RoutineCard
+              key={item.id}
+              routine={r}
+              done={item.done}
+              bumped={bumped[r.id]}
+              remindersOn={settings.remindersOn}
+              onPress={() => router.push(`/routine/${r.id}`)}
+              onLongPress={() => {
+                tapHaptic();
+                setPreview(r);
+              }}
+            />
+          );
+        } else {
+          const todo = todos.find((x) => x.id === item.id);
+          if (!todo) return null;
+          return (
+            <View
+              key={item.id}
+              style={{
+                backgroundColor: t.surface,
+                borderWidth: 2,
+                borderColor: t.lineSoft,
+                borderRadius: 18,
+                paddingHorizontal: 14,
+                paddingVertical: 2,
+              }}
+            >
+              <TodoRow todo={todo} />
+            </View>
+          );
+        }
+      })}
     </View>
   );
 
-  const renderDayCards = (list: Routine[]) => (
+  const renderDayCards = (list: AgendaItem[]) => (
     <View style={{ gap: 12 }}>
-      {list.map((r) => (
-        <RoutineCard
-          key={r.id}
-          routine={r}
-          done={dayDone.has(r.id)}
-          readonly
-          remindersOn={settings.remindersOn}
-          onPress={() => router.push(`/routine/${r.id}`)}
-          onLongPress={() => {}}
-        />
-      ))}
+      {list.map((item) => {
+        if (item.kind === 'routine') {
+          const r = routines.find((x) => x.id === item.id);
+          if (!r) return null;
+          return (
+            <RoutineCard
+              key={item.id}
+              routine={r}
+              done={item.done}
+              readonly
+              remindersOn={settings.remindersOn}
+              onPress={() => router.push(`/routine/${r.id}`)}
+              onLongPress={() => {}}
+            />
+          );
+        } else {
+          const todo = todos.find((x) => x.id === item.id);
+          if (!todo) return null;
+          return (
+            <View
+              key={item.id}
+              pointerEvents="none"
+              style={{
+                backgroundColor: t.surface,
+                borderWidth: 2,
+                borderColor: t.lineSoft,
+                borderRadius: 18,
+                paddingHorizontal: 14,
+                paddingVertical: 2,
+                opacity: 0.7,
+              }}
+            >
+              <TodoRow todo={todo} />
+            </View>
+          );
+        }
+      })}
     </View>
   );
 
   const dateLabel = viewDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const heroTitle = isToday ? greetingNow() : viewDate.toLocaleDateString('en-US', { weekday: 'long' });
   const routinesLabel = isToday
-    ? `Routines${todayRoutines.length ? ` · ${completed.length}/${todayRoutines.length}` : ''}`
+    ? `Routines${totalCount ? ` · ${doneCount}/${totalCount}` : ''}`
     : isPast
-      ? `Routines${dayRoutines.length ? ` · ${dayDoneCount}/${dayRoutines.length}` : ''}`
-      : `Routines${dayRoutines.length ? ` · ${dayRoutines.length}` : ''}`;
+      ? `Routines${totalCount ? ` · ${doneCount}/${totalCount}` : ''}`
+      : `Routines${totalCount ? ` · ${totalCount}` : ''}`;
+
+  const isTimeline = (settings.todayView ?? 'list') === 'timeline';
+
+  // shared bar: ROUTINES counter inline with the list/timeline switcher (or Done while reordering)
+  const sharedBar = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 12 }}>
+      <Label color={t.muted}>{routinesLabel}</Label>
+      {reordering ? (
+        <Chip active onPress={() => setReordering(false)}>Done</Chip>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 3, padding: 3, backgroundColor: t.raised, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 11 }}>
+          {([['list', IconList], ['timeline', IconClock]] as const).map(([mode, Icon]) => {
+            const active = (settings.todayView ?? 'list') === mode;
+            return (
+              <Pressable
+                key={mode}
+                onPressIn={() => tapHaptic()}
+                onPress={() => {
+                  // timeline always anchors on today — snap viewKey back when switching in
+                  if (mode === 'timeline' && viewKey !== todayK) setViewKey(todayK);
+                  setSettings({ todayView: mode });
+                }}
+                accessibilityLabel={mode === 'list' ? 'List view' : 'Timeline view'}
+                style={{ borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: active ? t.accent.main : 'transparent' }}
+              >
+                <Icon size={15} color={active ? t.accent.ink : t.muted} />
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+
+  // pinned hero header — stays put across modes
+  const heroHeader = (
+    <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable
+              onPressIn={() => tapHaptic()}
+              onPress={() => router.push('/calendar')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              accessibilityLabel="Open calendar"
+            >
+              <Label>{dateLabel}</Label>
+              <IconCal size={15} color={t.faint} />
+            </Pressable>
+          </View>
+          <Display size={30} style={{ marginTop: 8 }}>{heroTitle}</Display>
+          {isToday && nextUp ? (
+            <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Next: {nextUp.title} · {nextWhen}</Body>
+          ) : isFuture ? (
+            <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Coming up</Body>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+          {isToday && settings.streaks && <StreakBadge n={streak} />}
+          {!isToday && (
+            <Chip onPress={() => goDay(todayK)} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.muted }}>Today</Text>
+            </Chip>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
+  // sticky Anytime strip for timeline mode — today's flexible items, h-scroll on overflow
+  const anytimeStrip = agenda.anytime.length > 0 ? (
+    <View style={{ paddingLeft: 20, paddingBottom: 10 }}>
+      <Label style={{ marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 20 }}>
+        {agenda.anytime.map((item) => {
+          const done = item.done;
+          const due = item.due;
+          const color = item.kind === 'routine' ? t.col(item.color) : { main: t.accent.main, soft: t.accent.soft };
+          return (
+            <Pressable
+              key={item.id}
+              onPressIn={() => tapHaptic()}
+              onPress={() => {
+                if (item.kind === 'routine') router.push(`/routine/${item.id}`);
+                else router.push(`/task?id=${item.id}`);
+              }}
+              onLongPress={() => {
+                if (item.kind === 'routine') {
+                  const r = routines.find((x) => x.id === item.id);
+                  if (r) { tapHaptic(); setPreview(r); }
+                }
+              }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 6,
+                backgroundColor: done ? t.raised : t.surface,
+                borderWidth: 2, borderColor: done ? t.lineSoft : color.main,
+                borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10,
+                opacity: done ? 0.5 : 1,
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: done ? t.faint : t.text }}>{item.title}</Text>
+              {due && !done && (
+                <View style={{ backgroundColor: t.accent.soft, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
+                  <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 9, color: t.accent.main, textTransform: 'uppercase' }}>Due</Text>
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  ) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <GestureDetector gesture={swipe}>
-      <View style={{ flex: 1 }}>
-        {/* pinned hero header — stays put while the day's list slides on swipe */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Pressable
-                onPressIn={() => tapHaptic()}
-                onPress={() => router.push('/calendar')}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                accessibilityLabel="Open calendar"
-              >
-                <Label>{dateLabel}</Label>
-                <IconCal size={15} color={t.faint} />
-              </Pressable>
-              <Display size={30} style={{ marginTop: 8 }}>{heroTitle}</Display>
-              {isToday && nextUp ? (
-                <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Next: {nextUp.name} · {nextWhen}</Body>
-              ) : isFuture ? (
-                <Body size={13} color={t.muted} style={{ marginTop: 5 }}>Coming up</Body>
-              ) : null}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-              {isToday && settings.streaks && <StreakBadge n={streak} />}
-              {!isToday && (
-                <Chip onPress={() => goDay(todayK)} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
-                  <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 12, color: t.muted }}>Today</Text>
-                </Chip>
-              )}
-            </View>
-          </View>
-        </View>
+      {heroHeader}
+
+      {reordering ? (
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
-        <Animated.View style={panStyle}>
-          <Animated.View key={viewKey} entering={dir > 0 ? SLIDE_R : SLIDE_L}>
-
-        {/* routines header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 12 }}>
-          <Label color={t.muted}>{routinesLabel}</Label>
-          {isToday && (
-            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              {reordering ? (
-                <Chip active onPress={() => setReordering(false)}>Done</Chip>
-              ) : (
-                <>
-                  {(routines.length > 1 || archivedList.length > 0) && (
-                    <Chip onPress={() => setMenuOpen(true)} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
-                      <IconDots size={16} color={t.muted} />
-                    </Chip>
-                  )}
-                  <Chip onPress={() => setNewOpen(true)} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
-                    <IconPlus size={16} color={t.muted} />
-                  </Chip>
-                </>
-              )}
-            </View>
-          )}
+          {sharedBar}
+          <DragList
+            items={routines}
+            keyOf={(r) => r.id}
+            onReorder={reorder}
+            renderRow={(r, handle, dragging) => {
+              const c = t.col(r.color);
+              return (
+                <View
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
+                    backgroundColor: t.surface, borderWidth: 2, borderColor: dragging ? c.main : t.lineSoft, borderRadius: 18,
+                  }}
+                >
+                  {handle}
+                  <Text style={{ fontSize: 22 }}>{r.emoji}</Text>
+                  <Display size={15} style={{ flex: 1 }}>{r.name}</Display>
+                  <Label>{r.reminder ? fmtT(r.reminder) : 'anytime'}</Label>
+                </View>
+              );
+            }}
+          />
+        </ScrollView>
+      ) : isTimeline ? (
+        // timeline owns its own vertical scroll — no outer ScrollView, no horizontal day-swipe
+        <View style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20 }}>{sharedBar}</View>
+          {anytimeStrip}
+          <Timeline
+            routines={routines}
+            todos={todos}
+            todayK={todayK}
+            doneMap={doneMap}
+            history={history}
+            onRoutineLongPress={(r) => {
+              tapHaptic();
+              setPreview(r);
+            }}
+          />
         </View>
-
-        {isToday ? (
-          reordering ? (
-            <DragList
-              items={routines}
-              keyOf={(r) => r.id}
-              onReorder={reorder}
-              renderRow={(r, handle, dragging) => {
-                const c = t.col(r.color);
-                return (
-                  <View
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
-                      backgroundColor: t.surface, borderWidth: 2, borderColor: dragging ? c.main : t.lineSoft, borderRadius: 18,
-                    }}
-                  >
-                    {handle}
-                    <Text style={{ fontSize: 22 }}>{r.emoji}</Text>
-                    <Display size={15} style={{ flex: 1 }}>{r.name}</Display>
-                    <Label>{r.reminder ? fmtT(r.reminder) : 'anytime'}</Label>
-                  </View>
-                );
-              }}
-            />
-          ) : routines.length === 0 ? (
-            <ChunkyCard onPress={() => setNewOpen(true)}>
-              <View style={{ alignItems: 'center', padding: 22, gap: 8 }}>
-                <Text style={{ fontSize: 30 }}>🌱</Text>
-                <Body size={14} color={t.muted}>No routines yet. Tap to make one.</Body>
-              </View>
-            </ChunkyCard>
-          ) : todayRoutines.length === 0 ? (
-            <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
-              Nothing scheduled today.
-            </Body>
-          ) : (
-            <>
-              {scheduled.length > 0 && (
-                <>
-                  <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
-                  {renderCards(scheduled)}
-                </>
-              )}
-              {flexible.length > 0 && (
-                <>
-                  <Label style={{ marginTop: scheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
-                  {renderCards(flexible)}
-                </>
-              )}
-              {completed.length > 0 && (
-                <>
-                  <Label style={{ marginTop: scheduled.length + flexible.length ? 18 : 0, marginBottom: 8, fontSize: 11 }} color={t.green.main}>
-                    Completed
-                  </Label>
-                  {renderCards(completed)}
-                </>
-              )}
-            </>
-          )
-        ) : dayRoutines.length === 0 ? (
-          <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
-            Nothing scheduled.
-          </Body>
-        ) : (
-          <>
-            {dayScheduled.length > 0 && (
-              <>
-                <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
-                {renderDayCards(dayScheduled)}
-              </>
-            )}
-            {dayFlexible.length > 0 && (
-              <>
-                <Label style={{ marginTop: dayScheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
-                {renderDayCards(dayFlexible)}
-              </>
-            )}
-          </>
-        )}
-          </Animated.View>
-        </Animated.View>
-      </ScrollView>
-      </View>
-      </GestureDetector>
-
-      {/* ⋯ menu */}
-      <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Routines">
-        <View style={{ gap: 10 }}>
-          {routines.length > 1 && (
-            <ChunkyButton
-              ghost
-              fontSize={15}
-              pad={[14, 18]}
-              faceStyle={{ justifyContent: 'flex-start' }}
-              onPress={() => {
-                setMenuOpen(false);
-                setReordering(true);
-              }}
+      ) : (
+        <GestureDetector gesture={swipe}>
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              ref={scrollViewRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <IconDrag size={16} color={t.text} />
-              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                Reorder
-              </Text>
-            </ChunkyButton>
-          )}
-          {archivedList.length > 0 && (
-            <ChunkyButton
-              ghost
-              fontSize={15}
-              pad={[14, 18]}
-              faceStyle={{ justifyContent: 'flex-start' }}
-              onPress={() => {
-                setMenuOpen(false);
-                setArchOpen(true);
-              }}
-            >
-              <IconArchive size={16} color={t.text} />
-              <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: t.text, textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                Archived ({archivedList.length})
-              </Text>
-            </ChunkyButton>
-          )}
-        </View>
-      </BottomSheet>
+              <Animated.View style={panStyle}>
+                <Animated.View key={viewKey} entering={dir > 0 ? SLIDE_R : SLIDE_L}>
+                  {sharedBar}
+                  <>
+                    {isToday ? (
+                      routines.length === 0 ? (
+                        <ChunkyCard onPress={() => setNewOpen(true)}>
+                          <View style={{ alignItems: 'center', padding: 22, gap: 8 }}>
+                            <Text style={{ fontSize: 30 }}>🌱</Text>
+                            <Body size={14} color={t.muted}>No routines yet. Tap to make one.</Body>
+                          </View>
+                        </ChunkyCard>
+                      ) : (agenda.timed.length === 0 && agenda.anytime.length === 0) ? (
+                        <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
+                          Nothing scheduled today.
+                        </Body>
+                      ) : (
+                        <>
+                          {scheduled.length > 0 && (
+                            <>
+                              <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
+                              {renderCards(scheduled)}
+                            </>
+                          )}
+                          {flexible.length > 0 && (
+                            <>
+                              <Label style={{ marginTop: scheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+                              {renderCards(flexible)}
+                            </>
+                          )}
+                          {completed.length > 0 && (
+                            <>
+                              <Label style={{ marginTop: scheduled.length + flexible.length ? 18 : 0, marginBottom: 8, fontSize: 11 }} color={t.green.main}>
+                                Completed
+                              </Label>
+                              {renderCards(completed)}
+                            </>
+                          )}
+                        </>
+                      )
+                    ) : (agenda.timed.length === 0 && agenda.anytime.length === 0) ? (
+                      <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
+                        Nothing scheduled.
+                      </Body>
+                    ) : (
+                      <>
+                        {dayScheduled.length > 0 && (
+                          <>
+                            <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
+                            {renderDayCards(dayScheduled)}
+                          </>
+                        )}
+                        {dayFlexible.length > 0 && (
+                          <>
+                            <Label style={{ marginTop: dayScheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+                            {renderDayCards(dayFlexible)}
+                          </>
+                        )}
+                      </>
+                    )}
+                  </>
+                </Animated.View>
+              </Animated.View>
+            </ScrollView>
+          </View>
+        </GestureDetector>
+      )}
 
       <NewRoutineSheet open={newOpen} onClose={() => setNewOpen(false)} />
 
@@ -423,42 +537,8 @@ export default function TodayScreen() {
         }}
         onDelete={(r) => confirmDelete(r)}
         onPreviewAlarm={(r) => router.push(`/alarm/${r.id}`)}
+        onReorder={routines.length > 1 ? () => setReordering(true) : undefined}
       />
-
-      <BottomSheet open={archOpen} onClose={() => setArchOpen(false)} title="Archived">
-        {archivedList.length === 0 ? (
-          <Body size={13.5} color={t.faint} style={{ textAlign: 'center', padding: 16 }}>
-            Nothing archived.
-          </Body>
-        ) : (
-          <View>
-            {archivedList.map((r, i) => (
-              <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 2 : 0, borderColor: t.lineSoft }}>
-                <Text style={{ fontSize: 20, opacity: 0.7 }}>{r.emoji}</Text>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Display size={15}>{r.name}</Display>
-                  <Body size={12} color={t.faint}>{r.steps.length} steps</Body>
-                </View>
-                <Chip
-                  onPress={() => confirmDelete(r, () => archivedList.length <= 1 && setArchOpen(false))}
-                >
-                  <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.muted }}>Delete</Text>
-                </Chip>
-                <Chip
-                  active
-                  onPress={() => {
-                    restoreRoutine(r.id);
-                    toast('Restored');
-                    if (archivedList.length <= 1) setArchOpen(false);
-                  }}
-                >
-                  Restore
-                </Chip>
-              </View>
-            ))}
-          </View>
-        )}
-      </BottomSheet>
 
     </View>
   );

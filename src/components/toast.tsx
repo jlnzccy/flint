@@ -121,12 +121,6 @@ function Pill({ item }: { item: ToastItem }) {
               borderRadius: 14,
               paddingVertical: 11,
               paddingHorizontal: 18,
-              // Ember "chunky" depth — reads like the app's pressed surfaces
-              shadowColor: '#000',
-              shadowOpacity: 0.4,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 7 },
-              elevation: 9,
             },
             dragStyle,
           ]}

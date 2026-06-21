@@ -90,12 +90,11 @@ const STATIC_ACCENTS: Record<Exclude<ColorName, 'accent'>, AccentDef> = {
 };
 
 export const ACCENT_CHOICES = [
+  '#ff6b35', // Ember (Orange)
   '#1CB0F6', // Macaw (Blue)
   '#FF4B4B', // Cardinal (Red)
   '#FFC800', // Bee (Yellow)
-  '#FF9600', // Fox (Orange)
   '#CE82FF', // Beetle (Purple)
-  '#2B70C9', // Humpback (Dark Blue)
   '#58CC02'  // Feather Green (Green)
 ];
 
@@ -141,15 +140,16 @@ function softOf(def: AccentDef, theme: ThemeName): string {
 }
 
 export function buildPalette(theme: ThemeName, style: 'ember' | 'neutral', accentHex: string): Palette {
+  const resolvedAccent = accentHex === 'wallpaper' ? '#ff6b35' : accentHex;
   const base = style === 'neutral'
     ? (theme === 'light' ? NEUTRAL_LIGHT : NEUTRAL_DARK)
     : (theme === 'light' ? LIGHT : DARK);
   const matchedPreset = Object.values(STATIC_ACCENTS).find(
-    (preset) => preset.main.toLowerCase() === accentHex.toLowerCase()
+    (preset) => preset.main.toLowerCase() === resolvedAccent.toLowerCase()
   );
   const accentDef: AccentDef = matchedPreset
-    ? { main: accentHex, deep: matchedPreset.deep, ink: matchedPreset.ink }
-    : { main: accentHex, deep: hexDarken(accentHex, 0.62), ink: inkOn(accentHex) };
+    ? { main: resolvedAccent, deep: matchedPreset.deep, ink: matchedPreset.ink }
+    : { main: resolvedAccent, deep: hexDarken(resolvedAccent, 0.62), ink: inkOn(resolvedAccent) };
   const mk = (def: AccentDef, soft?: string): ColorSet => ({
     main: def.main,
     deep: def.deep,

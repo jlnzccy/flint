@@ -6,12 +6,12 @@ import { Routine } from '@/data/defaults';
  */
 export function serializeRoutine(r: Routine): string {
   const payload = {
-    name: r.name,
-    emoji: r.emoji,
-    color: r.color,
-    steps: r.steps.map((s) => ({ t: s.t, min: s.min, hint: s.hint })),
-    autoAdvance: r.autoAdvance,
-    warn30: r.warn30,
+    n: r.name,
+    e: r.emoji,
+    c: r.color,
+    s: r.steps.map((s) => ({ t: s.t, m: s.min, h: s.hint })),
+    a: r.autoAdvance ? 1 : 0,
+    w: r.warn30 ? 1 : 0,
   };
   const json = JSON.stringify(payload);
   const base64 = btoa(encodeURIComponent(json));
@@ -29,21 +29,29 @@ export function deserializeRoutine(str: string): Omit<Routine, 'id'> | null {
     const json = decodeURIComponent(atob(base64));
     const data = JSON.parse(json);
     
-    if (!data.name || !Array.isArray(data.steps) || data.steps.length === 0) {
+    // Support both new compact keys and old verbose keys
+    const name = data.n || data.name;
+    const emoji = data.e || data.emoji || '📅';
+    const color = data.c || data.color || 'accent';
+    const rawSteps = data.s || data.steps;
+    const autoAdvance = data.a !== undefined ? !!data.a : !!data.autoAdvance;
+    const warn30 = data.w !== undefined ? !!data.w : !!data.warn30;
+
+    if (!name || !Array.isArray(rawSteps) || rawSteps.length === 0) {
       return null;
     }
     
     return {
-      name: data.name.trim(),
-      emoji: data.emoji || '📅',
-      color: data.color || 'accent',
-      steps: data.steps.map((s: any) => ({
-        t: (s.t || 'Step').trim(),
-        min: Math.max(1, typeof s.min === 'number' ? s.min : 1),
-        hint: s.hint ? s.hint.trim() : undefined,
+      name: name.trim(),
+      emoji: emoji,
+      color: color,
+      steps: rawSteps.map((s: any) => ({
+        t: (s.t || s.title || 'Step').trim(),
+        min: Math.max(1, typeof s.m === 'number' ? s.m : typeof s.min === 'number' ? s.min : 1),
+        hint: s.h ? s.h.trim() : s.hint ? s.hint.trim() : undefined,
       })),
-      autoAdvance: !!data.autoAdvance,
-      warn30: !!data.warn30,
+      autoAdvance: !!autoAdvance,
+      warn30: !!warn30,
     };
   } catch (e) {
     return null;

@@ -1,0 +1,24 @@
+diff --git a/node_modules/react-native-audio-api/android/src/main/cpp/audioapi/android/core/AudioPlayer.cpp b/node_modules/react-native-audio-api/android/src/main/cpp/audioapi/android/core/AudioPlayer.cpp
+index a88c634..3ba9de8 100644
+--- a/node_modules/react-native-audio-api/android/src/main/cpp/audioapi/android/core/AudioPlayer.cpp
++++ b/node_modules/react-native-audio-api/android/src/main/cpp/audioapi/android/core/AudioPlayer.cpp
+@@ -25,9 +25,18 @@ AudioPlayer::AudioPlayer(
+ bool AudioPlayer::openAudioStream() {
+   AudioStreamBuilder builder;
+ 
+-  builder.setSharingMode(SharingMode::Exclusive)
++  // Shared (not Exclusive): Exclusive requests an AAudio MMAP low-latency endpoint
++  // that many built-in speakers only expose for one fixed config — a stereo-float
++  // request opens but routes to a silent endpoint, so tones came out over wired/BT
++  // (legacy/shared HAL path) but never the speaker. Shared forces the mixer path that
++  // works on every route. Usage/ContentType tag it as media so the OS routes/ducks
++  // correctly; channel conversion lets the mixer fold stereo into a mono speaker.
++  builder.setSharingMode(SharingMode::Shared)
++      ->setUsage(Usage::Media)
++      ->setContentType(ContentType::Music)
+       ->setFormat(AudioFormat::Float)
+       ->setFormatConversionAllowed(true)
++      ->setChannelConversionAllowed(true)
+       ->setPerformanceMode(PerformanceMode::None)
+       ->setChannelCount(channelCount_)
+       ->setSampleRateConversionQuality(SampleRateConversionQuality::Medium)

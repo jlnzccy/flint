@@ -25,12 +25,50 @@ export function WheelPicker({
   const clampIdx = (i: number) => Math.max(0, Math.min(options.length - 1, i));
   const pad = w > 0 ? (w - ITEM_W) / 2 : 0;
 
+  const initializedRef = useRef(false);
+  const isInteractingRef = useRef(false);
+  const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // reset initialization state if layout width is lost/reset
+  useEffect(() => {
+    if (w === 0) {
+      initializedRef.current = false;
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+        initTimeoutRef.current = null;
+      }
+    }
+  }, [w]);
+
+  // clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // keep selected value in sync with prop if changed from outside
   useEffect(() => {
     setSel(value);
     if (w > 0) {
       const idx = clampIdx(options.indexOf(value));
-      ref.current?.scrollTo({ x: idx * ITEM_W, animated: false });
+      // Only scroll programmatically if the position is not yet initialized, OR
+      // if the external value changed and the user is not actively scrolling.
+      // This prevents the state-update loop from fighting touch gestures or momentum.
+      if (!initializedRef.current || (!isInteractingRef.current && value !== sel)) {
+        const runScroll = () => {
+          ref.current?.scrollTo({ x: idx * ITEM_W, animated: false });
+        };
+        if (!initializedRef.current) {
+          if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
+          initTimeoutRef.current = setTimeout(runScroll, 50);
+          initializedRef.current = true;
+        } else {
+          runScroll();
+        }
+      }
     }
   }, [value, w, options]);
 
@@ -73,9 +111,22 @@ export function WheelPicker({
           showsHorizontalScrollIndicator={false}
           snapToInterval={ITEM_W}
           snapToAlignment="start"
-          decelerationRate="fast"
+          decelerationRate="normal"
+          disableIntervalMomentum={false}
           scrollEventThrottle={16}
           onScroll={onScroll}
+          onScrollBeginDrag={() => {
+            isInteractingRef.current = true;
+          }}
+          onScrollEndDrag={(e) => {
+            const velocityX = e.nativeEvent.velocity?.x ?? 0;
+            if (velocityX === 0) {
+              isInteractingRef.current = false;
+            }
+          }}
+          onMomentumScrollEnd={() => {
+            isInteractingRef.current = false;
+          }}
           contentContainerStyle={{ paddingHorizontal: pad }}
         >
           {options.map((v, i) => {

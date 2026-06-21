@@ -40,32 +40,7 @@ const fmtStepTimeShort = (min: number, sec: number) => {
   return `${min}m ${sec}s`;
 };
 
-/* Pomodoro config row: label + WheelPicker for selecting numbers. */
-function PomoWheelRow({
-  label, sub, value, options, unit, onChange,
-}: {
-  label: string;
-  sub?: string;
-  value: number;
-  options: number[];
-  unit: string;
-  onChange: (v: number) => void;
-}) {
-  const t = useTheme();
-  return (
-    <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ flex: 1 }}>
-          <Body size={15} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>{label}</Body>
-          {sub ? <Body size={12} color={t.faint} style={{ marginTop: 1 }}>{sub}</Body> : null}
-        </View>
-      </View>
-      <View style={{ height: 56, marginTop: 4 }}>
-        <WheelPicker value={value} options={options} unit={unit} onChange={onChange} />
-      </View>
-    </View>
-  );
-}
+
 
 export default function Editor() {
   const t = useTheme();
@@ -133,6 +108,7 @@ export default function Editor() {
     : tpl?.pomodoro ?? null;
   const isPomo = !!pomoSeed;
   const [pomo, setPomo] = useState<RoutinePomodoro | null>(pomoSeed);
+  const [pomoFieldOpen, setPomoFieldOpen] = useState<'sessions' | 'focusMin' | 'breakMin' | 'longBreakMin' | null>(null);
   // a slider change rebuilds the focus/break steps in place
   const setPomoField = (patch: Partial<RoutinePomodoro>) => {
     if (!pomo) return;
@@ -515,13 +491,68 @@ export default function Editor() {
         {isPomo && pomo ? (
           /* Pomodoro: sliders regenerate the focus/break steps; no manual list (W3) */
           <>
-             <Label style={{ marginTop: 22, marginBottom: 8 }}>Pomodoro</Label>
-             <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18, padding: 16, gap: 18 }}>
-               <PomoWheelRow label="Sessions" sub="focus blocks" value={pomo.sessions} options={Array.from({ length: 7 }, (_, i) => i + 2)} unit="sets" onChange={(v) => setPomoField({ sessions: v })} />
-               <PomoWheelRow label="Focus" value={pomo.focusMin} options={Array.from({ length: 12 }, (_, i) => (i + 1) * 5)} unit="min" onChange={(v) => setPomoField({ focusMin: v })} />
-               <PomoWheelRow label="Short break" value={pomo.breakMin} options={Array.from({ length: 20 }, (_, i) => i + 1)} unit="min" onChange={(v) => setPomoField({ breakMin: v })} />
-               <PomoWheelRow label="Long break" sub={`after every ${pomo.longEvery} focus`} value={pomo.longBreakMin} options={Array.from({ length: 9 }, (_, i) => (i + 1) * 5)} unit="min" onChange={(v) => setPomoField({ longBreakMin: v })} />
-             </View>
+            <Label style={{ marginTop: 22, marginBottom: 8 }}>Pomodoro</Label>
+            <View style={{ backgroundColor: t.surface, borderWidth: 2, borderColor: t.lineSoft, borderRadius: 18 }}>
+              <Pressable
+                onPressIn={() => tapHaptic()}
+                onPress={() => setPomoFieldOpen('sessions')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Display size={15}>Sessions</Display>
+                  <Body size={12} color={t.faint} style={{ marginTop: 2 }}>focus blocks</Body>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Display size={15} style={{ color: c.main }}>{pomo.sessions} sets</Display>
+                  <IconChevR size={18} color={t.faint} />
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPressIn={() => tapHaptic()}
+                onPress={() => setPomoFieldOpen('focusMin')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderTopWidth: 2, borderColor: t.lineSoft }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Display size={15}>Focus</Display>
+                  <Body size={12} color={t.faint} style={{ marginTop: 2 }}>duration</Body>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Display size={15} style={{ color: c.main }}>{pomo.focusMin} min</Display>
+                  <IconChevR size={18} color={t.faint} />
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPressIn={() => tapHaptic()}
+                onPress={() => setPomoFieldOpen('breakMin')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderTopWidth: 2, borderColor: t.lineSoft }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Display size={15}>Short break</Display>
+                  <Body size={12} color={t.faint} style={{ marginTop: 2 }}>between sessions</Body>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Display size={15} style={{ color: c.main }}>{pomo.breakMin} min</Display>
+                  <IconChevR size={18} color={t.faint} />
+                </View>
+              </Pressable>
+
+              <Pressable
+                onPressIn={() => tapHaptic()}
+                onPress={() => setPomoFieldOpen('longBreakMin')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderTopWidth: 2, borderColor: t.lineSoft }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Display size={15}>Long break</Display>
+                  <Body size={12} color={t.faint} style={{ marginTop: 2 }}>{`after every ${pomo.longEvery} focus`}</Body>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Display size={15} style={{ color: c.main }}>{pomo.longBreakMin} min</Display>
+                  <IconChevR size={18} color={t.faint} />
+                </View>
+              </Pressable>
+            </View>
             <Body size={12} color={t.faint} style={{ marginTop: 10, textAlign: 'center' }}>
               {steps.filter((s) => s.t === 'Focus').length} focus · {steps.filter((s) => s.t !== 'Focus').length} break{steps.filter((s) => s.t !== 'Focus').length === 1 ? '' : 's'} · {routineMin({ steps })} min total
             </Body>
@@ -730,6 +761,65 @@ export default function Editor() {
               pad={[15, 24]}
               style={{ marginTop: 10 }}
               onPress={() => setEditKey(null)}
+            >
+              Done
+            </ChunkyButton>
+          </View>
+        )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={pomoFieldOpen !== null}
+        onClose={() => setPomoFieldOpen(null)}
+        title={
+          pomoFieldOpen === 'sessions' ? 'Sessions' :
+          pomoFieldOpen === 'focusMin' ? 'Focus duration' :
+          pomoFieldOpen === 'breakMin' ? 'Short break' :
+          pomoFieldOpen === 'longBreakMin' ? 'Long break' :
+          ''
+        }
+      >
+        {pomo && pomoFieldOpen && (
+          <View style={{ gap: 20 }}>
+            {pomoFieldOpen === 'sessions' && (
+              <WheelPicker
+                value={pomo.sessions}
+                options={Array.from({ length: 7 }, (_, i) => i + 2)}
+                unit="sets"
+                onChange={(v) => setPomoField({ sessions: v })}
+              />
+            )}
+            {pomoFieldOpen === 'focusMin' && (
+              <WheelPicker
+                value={pomo.focusMin}
+                options={Array.from({ length: 12 }, (_, i) => (i + 1) * 5)}
+                unit="min"
+                onChange={(v) => setPomoField({ focusMin: v })}
+              />
+            )}
+            {pomoFieldOpen === 'breakMin' && (
+              <WheelPicker
+                value={pomo.breakMin}
+                options={Array.from({ length: 20 }, (_, i) => i + 1)}
+                unit="min"
+                onChange={(v) => setPomoField({ breakMin: v })}
+              />
+            )}
+            {pomoFieldOpen === 'longBreakMin' && (
+              <WheelPicker
+                value={pomo.longBreakMin}
+                options={Array.from({ length: 9 }, (_, i) => (i + 1) * 5)}
+                unit="min"
+                onChange={(v) => setPomoField({ longBreakMin: v })}
+              />
+            )}
+            <ChunkyButton
+              color={c.main}
+              deep={c.deep}
+              ink={c.ink}
+              fontSize={16}
+              pad={[15, 24]}
+              onPress={() => setPomoFieldOpen(null)}
             >
               Done
             </ChunkyButton>

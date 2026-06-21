@@ -131,16 +131,16 @@ export default function Onboarding() {
             <Dot key={i} active={i === page} />
           ))}
         </View>
-        {page < PAGES - 1 && (
-          <Pressable
-            onPressIn={() => tapHaptic()}
-            onPress={() => finish()}
-            hitSlop={10}
-            style={{ position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 8 }}
-          >
-            <Label color={t.faint}>Skip</Label>
-          </Pressable>
-        )}
+        {/* Skip lives on every page, including the last (create-routine) one — that page
+            has no Next, so without Skip there's no way to finish without making a routine. */}
+        <Pressable
+          onPressIn={() => tapHaptic()}
+          onPress={() => finish()}
+          hitSlop={10}
+          style={{ position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 8 }}
+        >
+          <Label color={t.faint}>Skip</Label>
+        </Pressable>
       </View>
 
       <ScrollView

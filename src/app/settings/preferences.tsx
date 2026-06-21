@@ -4,7 +4,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ColorPickerSheet } from '@/components/color-picker';
-import { IconChevL, IconPlus } from '@/components/icons';
+import { IconChevL, IconChevR, IconPlus } from '@/components/icons';
 import { tapHaptic } from '@/lib/haptics';
 import { useToast } from '@/components/toast';
 import { Body, Display, Label, Segmented, Toggle } from '@/components/ui';
@@ -71,78 +71,87 @@ export default function Preferences() {
           </View>
         </Card>
 
-        <Label style={{ marginTop: 20, marginBottom: 8 }}>Color Profile</Label>
-        <Card>
-          <View style={{ padding: 16, gap: 12 }}>
-            <Display size={16}>Style</Display>
-            <Segmented
-              value={settings.themeStyle ?? 'ember'}
-              onChange={(v) => setSettings({ themeStyle: v as 'ember' | 'neutral' })}
-              options={[
-                { value: 'ember', label: 'Ember (Warm)' },
-                { value: 'neutral', label: 'Neutral (Cool)' },
-              ]}
-            />
-          </View>
-        </Card>
+        {settings.themeStyle === 'material' || settings.themeStyle === 'wallpaper' ? (
+          <>
+            <Label style={{ marginTop: 20, marginBottom: 8 }}>Theming Labs</Label>
+            <Card>
+              <Pressable
+                onPressIn={() => tapHaptic()}
+                onPress={() => router.push('/settings/theme-labs')}
+              >
+                <Row
+                  title="Theming Labs"
+                  sub="Dynamic theming is active. Tap to open labs."
+                  top
+                >
+                  <IconChevR size={18} color={t.faint} />
+                </Row>
+              </Pressable>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Label style={{ marginTop: 20, marginBottom: 8 }}>Color Profile</Label>
+            <Card>
+              <View style={{ padding: 16, gap: 12 }}>
+                <Display size={16}>Style</Display>
+                <Segmented
+                  value={settings.themeStyle ?? 'ember'}
+                  onChange={(v) => setSettings({ themeStyle: v as 'ember' | 'neutral' })}
+                  options={[
+                    { value: 'ember', label: 'Ember (Warm)' },
+                    { value: 'neutral', label: 'Neutral (Cool)' },
+                  ]}
+                />
+              </View>
+            </Card>
 
-        <Label style={{ marginTop: 22, marginBottom: 8 }}>Accent Color</Label>
-        <Card>
-          <View style={{ padding: 16, gap: 12 }}>
-            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-              {ACCENT_CHOICES.map((a) => {
-                const active = a === accent;
-                const dark = hexDarken(a, 0.55);
-                return (
+            <Label style={{ marginTop: 22, marginBottom: 8 }}>Accent Color</Label>
+            <Card>
+              <View style={{ padding: 16, gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                  {ACCENT_CHOICES.map((a) => {
+                    const active = a === accent;
+                    const dark = hexDarken(a, 0.55);
+                    return (
+                      <Pressable
+                        key={a}
+                        accessibilityLabel={a}
+                        onPressIn={() => tapHaptic()}
+                        onPress={() => setAccent(a)}
+                        style={{
+                          width: 40, height: 40, borderRadius: 20, backgroundColor: a,
+                          borderWidth: active ? 3 : 1.5,
+                          borderColor: active ? dark : t.line,
+                          alignItems: 'center', justifyContent: 'center',
+                          transform: [{ scale: active ? 1.12 : 1 }],
+                        }}
+                      >
+                        {/* tonal ring + dot — a darker shade of the swatch, not black */}
+                        <View style={{ width: 15, height: 15, borderRadius: 8, backgroundColor: dark }} />
+                      </Pressable>
+                    );
+                  })}
                   <Pressable
-                    key={a}
-                    accessibilityLabel={a}
+                    accessibilityLabel={customAccent ? 'Edit custom accent' : 'Custom accent'}
                     onPressIn={() => tapHaptic()}
-                    onPress={() => setAccent(a)}
+                    onPress={() => setAccentOpen(true)}
                     style={{
-                      width: 40, height: 40, borderRadius: 20, backgroundColor: a,
-                      borderWidth: active ? 3 : 1.5,
-                      borderColor: active ? dark : t.line,
+                      width: 40, height: 40, borderRadius: 20,
+                      backgroundColor: customAccent ? accent : t.raised,
+                      borderWidth: 2,
+                      borderColor: customAccent ? hexDarken(accent, 0.55) : t.line,
                       alignItems: 'center', justifyContent: 'center',
-                      transform: [{ scale: active ? 1.12 : 1 }],
+                      transform: [{ scale: customAccent ? 1.12 : 1 }],
                     }}
                   >
-                    {/* tonal ring + dot — a darker shade of the swatch, not black */}
-                    <View style={{ width: 15, height: 15, borderRadius: 8, backgroundColor: dark }} />
+                    <IconPlus size={16} color={customAccent ? inkOn(accent) : t.muted} />
                   </Pressable>
-                );
-              })}
-              <Pressable
-                accessibilityLabel={customAccent ? 'Edit custom accent' : 'Custom accent'}
-                onPressIn={() => tapHaptic()}
-                onPress={() => setAccentOpen(true)}
-                style={{
-                  width: 40, height: 40, borderRadius: 20,
-                  backgroundColor: customAccent ? accent : t.raised,
-                  borderWidth: 2,
-                  borderColor: customAccent ? hexDarken(accent, 0.55) : t.line,
-                  alignItems: 'center', justifyContent: 'center',
-                  transform: [{ scale: customAccent ? 1.12 : 1 }],
-                }}
-              >
-                <IconPlus size={16} color={customAccent ? inkOn(accent) : t.muted} />
-              </Pressable>
-            </View>
-
-            <Pressable
-              accessibilityLabel="Material You"
-              onPressIn={() => tapHaptic()}
-              onPress={() => toast('Coming soon')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}
-            >
-              <View style={{ flex: 1 }}>
-                <Body size={14} style={{ fontFamily: 'BeVietnamPro_600SemiBold' }}>Material You</Body>
-                <Body size={12} color={t.faint} style={{ marginTop: 1 }}>Match your wallpaper</Body>
+                </View>
               </View>
-              <Body size={12} color={t.faint}>Coming soon</Body>
-            </Pressable>
-          </View>
-        </Card>
+            </Card>
+          </>
+        )}
 
         <Label style={{ marginTop: 22, marginBottom: 8 }}>Display & Timing</Label>
         <Card>

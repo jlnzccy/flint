@@ -11,7 +11,6 @@ const android = Platform.OS === 'android';
    path (selectionAsync/impactAsync) holds the motor on ~50ms and feels buzzy,
    so on Android we route through the device haptic engine via
    performAndroidHapticsAsync — single sharp taps, no VIBRATE permission.
-   Feel each constant in /haptics-lab; swap the names below to retune.
 
    tap = lightest selection tick · done = soft single tap on a step/task done
    finish = the one richer cue, reserved for completing a whole routine.
