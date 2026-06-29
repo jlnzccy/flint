@@ -365,7 +365,7 @@ export default function TodayScreen() {
                 opacity: done ? 0.5 : 1,
               }}
             >
-              <Text style={{ fontSize: 16 }}>{item.emoji}</Text>
+              <Text style={{ fontSize: 16, fontFamily: 'NotoColorEmoji' }}>{item.emoji}</Text>
               <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: done ? t.faint : t.text }}>{item.title}</Text>
               {due && !done && (
                 <View style={{ backgroundColor: t.accent.soft, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 }}>
@@ -404,7 +404,7 @@ export default function TodayScreen() {
                   }}
                 >
                   {handle}
-                  <Text style={{ fontSize: 22 }}>{r.emoji}</Text>
+                  <Text style={{ fontSize: 22, fontFamily: 'NotoColorEmoji' }}>{r.emoji}</Text>
                   <Display size={15} style={{ flex: 1 }}>{r.name}</Display>
                   <Label>{r.reminder ? fmtT(r.reminder) : 'anytime'}</Label>
                 </View>

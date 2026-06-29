@@ -441,7 +441,7 @@ export function Timeline({
                   >
                     <View style={{ position: 'absolute', left: 0, right: 0, top: 8, height: 2, borderRadius: 1, backgroundColor: done ? t.lineSoft : c.main, opacity: done ? 1 : 0.55 }} />
                     <View style={{ position: 'absolute', left: BLOCK_PAD, top: 0, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: t.bg, paddingRight: 8 }}>
-                      <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'NotoColorEmoji' }}>{r.emoji}</Text>
                       <Display size={12} numberOfLines={1} style={{ color: done ? t.faint : c.main }}>{r.name}</Display>
                       {done && (
                         <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: t.green.main, alignItems: 'center', justifyContent: 'center' }}>
@@ -487,7 +487,7 @@ export function Timeline({
                         overflow: 'visible',
                       }}
                     >
-                      <Text style={{ fontSize: isSmall ? 13 : 20 }}>{r.emoji}</Text>
+                      <Text style={{ fontSize: isSmall ? 13 : 20, fontFamily: 'NotoColorEmoji' }}>{r.emoji}</Text>
                       <View style={{ flex: 1, minWidth: 0, overflow: 'visible' }}>
                         <Display size={isSmall ? 12 : 15} numberOfLines={1} style={{ color: done ? t.faint : t.text }}>
                           {r.name}

@@ -69,7 +69,8 @@ export default function Onboarding() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const width = windowWidth >= 560 ? 540 : windowWidth;
 
   const complete = useStore((s) => s.completeOnboarding);
   const settings = useStore((s) => s.settings);

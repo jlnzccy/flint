@@ -72,7 +72,7 @@ function GlyphBob({ emoji, size }: { emoji: string; size: number }) {
   }, [s]);
   const st = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
-    <Animated.Text style={[{ fontSize: size * 0.86, lineHeight: size, textAlign: 'center' }, st]}>
+    <Animated.Text style={[{ fontSize: size * 0.86, lineHeight: size, textAlign: 'center', fontFamily: 'NotoColorEmoji' }, st]}>
       {emoji}
     </Animated.Text>
   );

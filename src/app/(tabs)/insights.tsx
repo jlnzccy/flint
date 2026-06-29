@@ -233,7 +233,7 @@ export default function Insights() {
           ) : (
             data.breakdown.map(({ r, pct }, i) => (
               <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 2 : 0, borderColor: t.lineSoft }}>
-                <Text style={{ fontSize: 18 }}>{r.emoji}</Text>
+                <Text style={{ fontSize: 18, fontFamily: 'NotoColorEmoji' }}>{r.emoji}</Text>
                 <Body size={14} style={{ flex: 1, fontFamily: 'BeVietnamPro_600SemiBold' }}>{r.name}</Body>
                 <MiniBar pct={pct} color={t.col(r.color).main} style={{ width: 90 }} />
                 <Display size={13} style={{ width: 38, textAlign: 'right', color: t.muted }}>{pct}%</Display>

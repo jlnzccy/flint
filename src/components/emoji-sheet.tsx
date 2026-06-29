@@ -67,7 +67,7 @@ export function EmojiSheet({ open, value, onClose, onPick }: Props) {
             position: 'relative', overflow: 'hidden',
           }}
         >
-          <Text style={{ fontSize: 28, color: t.text }}>{typed}</Text>
+          <Text style={{ fontSize: 28, color: t.text, fontFamily: 'NotoColorEmoji' }}>{typed}</Text>
           <TextInput
             ref={inputRef}
             value=""
@@ -165,7 +165,7 @@ export function EmojiSheet({ open, value, onClose, onPick }: Props) {
                 alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 24 }}>{item}</Text>
+              <Text style={{ fontSize: 24, fontFamily: 'NotoColorEmoji' }}>{item}</Text>
             </Pressable>
           );
         }}

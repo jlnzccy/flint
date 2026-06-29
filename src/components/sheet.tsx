@@ -131,6 +131,9 @@ export function BottomSheet({ open, onClose, title, scroll = true, children }: B
                 paddingHorizontal: 20,
                 paddingBottom: 20 + insets.bottom,
                 maxHeight: '88%',
+                width: '100%',
+                maxWidth: 540,
+                alignSelf: 'center',
               },
               cardStyle,
             ]}

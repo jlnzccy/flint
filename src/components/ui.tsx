@@ -232,7 +232,7 @@ export function EmojiTile({
         opacity: dim ? 0.6 : 1,
       }}
     >
-      <Text style={{ fontSize: size * 0.46 }}>{emoji}</Text>
+      <Text style={{ fontSize: size * 0.46, fontFamily: 'NotoColorEmoji' }}>{emoji}</Text>
     </View>
   );
 }

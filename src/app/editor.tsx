@@ -300,7 +300,7 @@ export default function Editor() {
                 transform: [{ scale: em === emoji ? 1.06 : 1 }],
               }}
             >
-              <Text style={{ fontSize: 21 }}>{em}</Text>
+              <Text style={{ fontSize: 21, fontFamily: 'NotoColorEmoji' }}>{em}</Text>
             </Pressable>
           ))}
           {/* a chosen custom emoji shows as its own selected tile… */}
@@ -316,7 +316,7 @@ export default function Editor() {
                 transform: [{ scale: 1.06 }],
               }}
             >
-              <Text style={{ fontSize: 21 }}>{emoji}</Text>
+              <Text style={{ fontSize: 21, fontFamily: 'NotoColorEmoji' }}>{emoji}</Text>
             </Pressable>
           )}
           {/* …and the "+" opens the picker sheet (type or browse) */}

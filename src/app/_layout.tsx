@@ -117,6 +117,7 @@ export default function RootLayout() {
     BeVietnamPro_500Medium,
     BeVietnamPro_600SemiBold,
     BeVietnamPro_700Bold,
+    'NotoColorEmoji': require('../../assets/fonts/NotoColorEmoji-Regular.ttf'),
   });
 
   // wait for persisted state before deciding onboarding/blank — avoids a flash
