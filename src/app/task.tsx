@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
@@ -97,9 +97,13 @@ export default function TaskEditor() {
     setNewSub('');
   };
 
+  const { width } = useWindowDimensions();
+  const isWide = width >= 600;
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: isWide ? 640 : undefined, alignSelf: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
         <CircleBtn size={44} onPress={() => router.back()} label="Close">
           <IconX color={t.text} />
         </CircleBtn>
@@ -409,6 +413,7 @@ export default function TaskEditor() {
           </ChunkyButton>
         </View>
       </BottomSheet>
+      </View>
     </View>
   );
 }

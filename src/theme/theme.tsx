@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useColorScheme, View, useWindowDimensions } from 'react-native';
+import { useColorScheme, View } from 'react-native';
 import { vars } from 'nativewind';
 
 import { buildPalette, Palette, hexDarken, hexAlpha, ColorSet } from './colors';
@@ -20,9 +20,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
 
   const eff = themePref === 'system' ? (system === 'light' ? 'light' : 'dark') : themePref;
-  const { width } = useWindowDimensions();
-  const isWide = width >= 560;
-  const letterboxBg = eff === 'dark' ? '#0f0c0b' : '#ede9e2';
   const materialColors = useSafeMaterialColors(eff, themeStyle === 'wallpaper' ? 'wallpaper' : accent);
 
   const palette = useMemo(() => {
@@ -181,28 +178,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider value={palette}>
-      <View style={[{ flex: 1, backgroundColor: isWide ? letterboxBg : palette.bg }, cssVars]}>
-        <View
-          style={[
-            { flex: 1, width: '100%' },
-            isWide && {
-              maxWidth: 540,
-              alignSelf: 'center',
-              backgroundColor: palette.bg,
-              borderLeftWidth: 2,
-              borderRightWidth: 2,
-              borderColor: palette.lineSoft,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.12,
-              shadowRadius: 10,
-              elevation: 8,
-            },
-          ]}
-        >
-          {children}
-        </View>
-      </View>
+      <View style={[{ flex: 1, backgroundColor: palette.bg }, cssVars]}>{children}</View>
     </ThemeContext.Provider>
   );
 }

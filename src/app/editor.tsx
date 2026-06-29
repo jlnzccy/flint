@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as IntentLauncher from 'expo-intent-launcher';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, InteractionManager, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { BackHandler, InteractionManager, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton, CircleBtn } from '@/components/chunky';
@@ -264,9 +264,13 @@ export default function Editor() {
     }
   };
 
+  const { width } = useWindowDimensions();
+  const isWide = width >= 600;
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: isWide ? 640 : undefined, alignSelf: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
         <CircleBtn size={44} onPress={leave} label="Close">
           <IconX color={t.text} />
         </CircleBtn>
@@ -828,6 +832,7 @@ export default function Editor() {
           </View>
         )}
       </BottomSheet>
+      </View>
     </View>
   );
 }

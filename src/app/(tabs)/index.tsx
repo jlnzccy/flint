@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, Keyframe, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -379,6 +379,65 @@ export default function TodayScreen() {
     </View>
   ) : null;
 
+  // Anytime vertical list helper for widescreen Timeline mode
+  const renderAnytimeVerticalList = () => {
+    if (agenda.anytime.length === 0) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Body size={14} color={t.faint} style={{ textAlign: 'center' }}>No anytime items.</Body>
+        </View>
+      );
+    }
+    return (
+      <View style={{ flex: 1 }}>
+        <Label style={{ marginBottom: 12, fontSize: 11 }}>Anytime</Label>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 28 }}>
+          {anytimeSorted.map((item) => {
+            const done = item.done;
+            const due = item.due;
+            const color = item.kind === 'routine' ? t.col(item.color) : { main: t.accent.main, soft: t.accent.soft };
+            return (
+              <Pressable
+                key={item.id}
+                onPressIn={() => tapHaptic()}
+                onPress={() => {
+                  if (item.kind === 'routine') router.push(`/routine/${item.id}`);
+                  else router.push(`/task?id=${item.id}`);
+                }}
+                onLongPress={() => {
+                  if (item.kind === 'routine') {
+                    const r = routines.find((x) => x.id === item.id);
+                    if (r) { tapHaptic(); setPreview(r); }
+                  }
+                }}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  backgroundColor: done ? t.raised : t.surface,
+                  borderWidth: 2, borderColor: done ? t.lineSoft : color.main,
+                  borderRadius: 18, paddingVertical: 12, paddingHorizontal: 16,
+                  opacity: done ? 0.5 : 1,
+                }}
+              >
+                <Text style={{ fontSize: 20, fontFamily: 'NotoColorEmoji' }}>{item.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 15, color: done ? t.faint : t.text }}>{item.title}</Text>
+                </View>
+                {due && !done && (
+                  <View style={{ backgroundColor: t.accent.soft, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                    <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 9, color: t.accent.main, textTransform: 'uppercase' }}>Due</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const { width } = useWindowDimensions();
+  const isWide = width >= 600;
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       {heroHeader}
@@ -414,23 +473,47 @@ export default function TodayScreen() {
         </ScrollView>
       ) : isTimeline ? (
         // timeline owns its own vertical scroll — no outer ScrollView, no horizontal day-swipe
-        <View style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20 }}>{sharedBar}</View>
-          <Timeline
-            routines={routines}
-            todos={todos}
-            todayK={todayK}
-            doneMap={doneMap}
-            history={history}
-            viewKey={viewKey}
-            onViewKeyChange={setViewKey}
-            onRoutineLongPress={(r) => {
-              tapHaptic();
-              setPreview(r);
-            }}
-          />
-          {anytimeStrip}
-        </View>
+        isWide ? (
+          <View style={{ flex: 1, flexDirection: 'row' }}>
+            <View style={{ flex: 1.3, borderRightWidth: 2, borderColor: t.lineSoft }}>
+              <View style={{ paddingHorizontal: 20 }}>{sharedBar}</View>
+              <Timeline
+                routines={routines}
+                todos={todos}
+                todayK={todayK}
+                doneMap={doneMap}
+                history={history}
+                viewKey={viewKey}
+                onViewKeyChange={setViewKey}
+                onRoutineLongPress={(r) => {
+                  tapHaptic();
+                  setPreview(r);
+                }}
+              />
+            </View>
+            <View style={{ flex: 0.7, paddingHorizontal: 20, paddingTop: 10 }}>
+              {renderAnytimeVerticalList()}
+            </View>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: 20 }}>{sharedBar}</View>
+            <Timeline
+              routines={routines}
+              todos={todos}
+              todayK={todayK}
+              doneMap={doneMap}
+              history={history}
+              viewKey={viewKey}
+              onViewKeyChange={setViewKey}
+              onRoutineLongPress={(r) => {
+                tapHaptic();
+                setPreview(r);
+              }}
+            />
+            {anytimeStrip}
+          </View>
+        )
       ) : (
         <GestureDetector gesture={swipe}>
           <View style={{ flex: 1 }}>
@@ -444,64 +527,142 @@ export default function TodayScreen() {
               <Animated.View style={panStyle}>
                 <Animated.View key={viewKey} entering={dir > 0 ? SLIDE_R : SLIDE_L}>
                   {sharedBar}
-                  <>
-                    {isToday ? (
-                      routines.length === 0 ? (
-                        <ChunkyCard onPress={() => setNewOpen(true)}>
-                          <View style={{ alignItems: 'center', padding: 22, gap: 8 }}>
-                            <Text style={{ fontSize: 30 }}>🌱</Text>
-                            <Body size={14} color={t.muted}>No routines yet. Tap to make one.</Body>
-                          </View>
-                        </ChunkyCard>
-                      ) : (agenda.timed.length === 0 && agenda.anytime.length === 0) ? (
-                        <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
-                          Nothing scheduled today.
-                        </Body>
-                      ) : (
-                        <>
-                          {scheduled.length > 0 && (
-                            <>
-                              <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
-                              {renderCards(scheduled)}
-                            </>
-                          )}
-                          {flexible.length > 0 && (
-                            <>
-                              <Label style={{ marginTop: scheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
-                              {renderCards(flexible)}
-                            </>
-                          )}
-                          {completed.length > 0 && (
-                            <>
-                              <Label style={{ marginTop: scheduled.length + flexible.length ? 18 : 0, marginBottom: 8, fontSize: 11 }} color={t.green.main}>
-                                Completed
-                              </Label>
-                              {renderCards(completed)}
-                            </>
-                          )}
-                        </>
-                      )
+                  {isWide ? (
+                    routines.length === 0 ? (
+                      <ChunkyCard onPress={() => setNewOpen(true)}>
+                        <View style={{ alignItems: 'center', padding: 22, gap: 8 }}>
+                          <Text style={{ fontSize: 30 }}>🌱</Text>
+                          <Body size={14} color={t.muted}>No routines yet. Tap to make one.</Body>
+                        </View>
+                      </ChunkyCard>
                     ) : (agenda.timed.length === 0 && agenda.anytime.length === 0) ? (
                       <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
                         Nothing scheduled.
                       </Body>
                     ) : (
-                      <>
-                        {dayScheduled.length > 0 && (
+                      <View style={{ flexDirection: 'row', gap: 24, marginTop: 4 }}>
+                        <View style={{ flex: 1.3 }}>
+                          {isToday ? (
+                            <>
+                              {scheduled.length > 0 ? (
+                                <>
+                                  <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
+                                  {renderCards(scheduled)}
+                                </>
+                              ) : (
+                                <Body size={14} color={t.faint} style={{ paddingVertical: 18 }}>
+                                  No scheduled routines today.
+                                </Body>
+                              )}
+                              {completed.length > 0 && (
+                                <>
+                                  <Label style={{ marginTop: 24, marginBottom: 8, fontSize: 11 }} color={t.green.main}>
+                                    Completed
+                                  </Label>
+                                  {renderCards(completed)}
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {dayScheduled.length > 0 ? (
+                                <>
+                                  <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
+                                  {renderDayCards(dayScheduled)}
+                                </>
+                              ) : (
+                                <Body size={14} color={t.faint} style={{ paddingVertical: 18 }}>
+                                  No scheduled routines.
+                                </Body>
+                              )}
+                            </>
+                          )}
+                        </View>
+
+                        <View style={{ flex: 0.7, borderLeftWidth: 2, borderColor: t.lineSoft, paddingLeft: 24 }}>
+                          {isToday ? (
+                            <>
+                              <Label style={{ marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+                              {flexible.length > 0 ? renderCards(flexible) : (
+                                <Body size={14} color={t.faint} style={{ paddingVertical: 18 }}>
+                                  No anytime items today.
+                                </Body>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <Label style={{ marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+                              {dayFlexible.length > 0 ? renderDayCards(dayFlexible) : (
+                                <Body size={14} color={t.faint} style={{ paddingVertical: 18 }}>
+                                  No anytime items.
+                                </Body>
+                              )}
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    )
+                  ) : (
+                    // Compact vertical stacked view
+                    <>
+                      {isToday ? (
+                        routines.length === 0 ? (
+                          <ChunkyCard onPress={() => setNewOpen(true)}>
+                            <View style={{ alignItems: 'center', padding: 22, gap: 8 }}>
+                              <Text style={{ fontSize: 30 }}>🌱</Text>
+                              <Body size={14} color={t.muted}>No routines yet. Tap to make one.</Body>
+                            </View>
+                          </ChunkyCard>
+                        ) : (agenda.timed.length === 0 && agenda.anytime.length === 0) ? (
+                          <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
+                            Nothing scheduled today.
+                          </Body>
+                        ) : (
                           <>
-                            <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
-                            {renderDayCards(dayScheduled)}
+                            {scheduled.length > 0 && (
+                              <>
+                                <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
+                                {renderCards(scheduled)}
+                              </>
+                            )}
+                            {flexible.length > 0 && (
+                              <>
+                                <Label style={{ marginTop: scheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+                                {renderCards(flexible)}
+                              </>
+                            )}
+                            {completed.length > 0 && (
+                              <>
+                                <Label style={{ marginTop: scheduled.length + flexible.length ? 18 : 0, marginBottom: 8, fontSize: 11 }} color={t.green.main}>
+                                  Completed
+                                </Label>
+                                {renderCards(completed)}
+                              </>
+                            )}
                           </>
-                        )}
-                        {dayFlexible.length > 0 && (
-                          <>
-                            <Label style={{ marginTop: dayScheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
-                            {renderDayCards(dayFlexible)}
-                          </>
-                        )}
-                      </>
-                    )}
-                  </>
+                        )
+                      ) : (agenda.timed.length === 0 && agenda.anytime.length === 0) ? (
+                        <Body size={14} color={t.faint} style={{ textAlign: 'center', paddingVertical: 18 }}>
+                          Nothing scheduled.
+                        </Body>
+                      ) : (
+                        <>
+                          {dayScheduled.length > 0 && (
+                            <>
+                              <Label style={{ marginBottom: 8, fontSize: 11 }}>Scheduled</Label>
+                              {renderDayCards(dayScheduled)}
+                            </>
+                          )}
+                          {dayFlexible.length > 0 && (
+                            <>
+                              <Label style={{ marginTop: dayScheduled.length ? 18 : 0, marginBottom: 8, fontSize: 11 }}>Anytime</Label>
+                              {renderDayCards(dayFlexible)}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
                 </Animated.View>
               </Animated.View>
             </ScrollView>

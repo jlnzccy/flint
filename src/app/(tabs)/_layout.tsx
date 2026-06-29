@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/chunky';
@@ -16,7 +16,7 @@ const TABS = [
   { name: 'settings', label: 'Settings', Icon: IconGear },
 ];
 
-function TabBar({ state, navigation, onAdd }: any) {
+function TabBar({ state, navigation, onAdd, isWide }: any) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -35,7 +35,7 @@ function TabBar({ state, navigation, onAdd }: any) {
             tapHaptic();
             if (!active) navigation.navigate(route.name);
           }}
-          style={{ width: '20%', alignItems: 'center', paddingTop: 16, paddingBottom: 18 }}
+          style={isWide ? { width: '100%', alignItems: 'center', paddingVertical: 14 } : { width: '20%', alignItems: 'center', paddingTop: 16, paddingBottom: 18 }}
         >
           {/* icon-only — active tab = rounded square, 2px accent outline + soft fill.
              inactive keeps a transparent 2px border so the icon never shifts. */}
@@ -62,7 +62,7 @@ function TabBar({ state, navigation, onAdd }: any) {
   // sits flush inside the bar (no negative margin) — the row centers it against the icons.
   const mid = Math.ceil(tabs.length / 2);
   const addBtn = (
-    <View key="add" style={{ width: '20%', alignItems: 'center', justifyContent: 'center' }}>
+    <View key="add" style={isWide ? { paddingVertical: 12, alignItems: 'center' } : { width: '20%', alignItems: 'center', justifyContent: 'center' }}>
       <ChunkyButton
         color={t.accent.main}
         deep={t.accent.deep}
@@ -78,6 +78,31 @@ function TabBar({ state, navigation, onAdd }: any) {
       </ChunkyButton>
     </View>
   );
+
+  if (isWide) {
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 72,
+          borderRightWidth: 2,
+          borderColor: t.lineSoft,
+          backgroundColor: t.surface,
+          paddingTop: insets.top + 20,
+          alignItems: 'center',
+          gap: 6,
+          zIndex: 10,
+        }}
+      >
+        {addBtn}
+        <View style={{ height: 2, width: 36, backgroundColor: t.lineSoft, marginVertical: 12 }} />
+        {tabs}
+      </View>
+    );
+  }
 
   return (
     <View
@@ -98,12 +123,22 @@ function TabBar({ state, navigation, onAdd }: any) {
 export default function TabsLayout() {
   const t = useTheme();
   const [newOpen, setNewOpen] = useState(false);
+  const { width } = useWindowDimensions();
+  const isWide = width >= 600;
+
   return (
     <>
       <Tabs
-        tabBar={(props) => <TabBar {...props} onAdd={() => setNewOpen(true)} />}
+        tabBar={(props) => <TabBar {...props} onAdd={() => setNewOpen(true)} isWide={isWide} />}
         // tabs cross-fade between destinations — buttery, not a hard snap
-        screenOptions={{ headerShown: false, animation: 'fade', sceneStyle: { backgroundColor: t.bg } }}
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          sceneStyle: {
+            backgroundColor: t.bg,
+            paddingLeft: isWide ? 72 : 0,
+          },
+        }}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="tasks" />
