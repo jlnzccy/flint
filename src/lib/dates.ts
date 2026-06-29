@@ -87,6 +87,24 @@ export function resolveClock24(mode: 'system' | '12' | '24'): boolean {
   return mode === '24' ? true : mode === '12' ? false : systemClock24();
 }
 
+/* device locale tag (e.g. "en-GB") for Intl date formatting; '' → runtime default.
+   Cached after first probe so dates follow the OS region (US "Jun 19" vs UK "19 Jun"). */
+let _locale: string | null = null;
+export function sysLocale(): string | undefined {
+  if (_locale != null) return _locale || undefined;
+  try {
+    _locale = Localization.getLocales?.()[0]?.languageTag || '';
+  } catch {
+    _locale = '';
+  }
+  return _locale || undefined;
+}
+
+/* locale-aware date formatter — honours the device's regional date order */
+export function fmtDate(d: Date, opts: Intl.DateTimeFormatOptions): string {
+  return d.toLocaleDateString(sysLocale(), opts);
+}
+
 export function fmtSec(s: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
@@ -137,7 +155,7 @@ export function fmtKey(k?: string | null): string {
   const d = keyToDate(k);
   const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-  return d.toLocaleDateString('en-US', opts);
+  return fmtDate(d, opts);
 }
 
 export function isToday(k?: string | null): boolean {

@@ -90,12 +90,12 @@ const STATIC_ACCENTS: Record<Exclude<ColorName, 'accent'>, AccentDef> = {
 };
 
 export const ACCENT_CHOICES = [
-  '#ff6b35', // Ember (Orange)
-  '#1CB0F6', // Macaw (Blue)
-  '#FF4B4B', // Cardinal (Red)
-  '#FFC800', // Bee (Yellow)
-  '#CE82FF', // Beetle (Purple)
-  '#58CC02'  // Feather Green (Green)
+  '#ff6b35', // Orange
+  '#1CB0F6', // Blue
+  '#FF4B4B', // Red
+  '#FFC800', // Yellow
+  '#CE82FF', // Purple
+  '#58CC02'  // Green
 ];
 
 export interface ColorSet {

@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Pressable, Text, View, ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, Easing, runOnJS } from 'react-native-reanimated';
 
 import { IconCheck, IconPlay } from '@/components/icons';
 import { Body, Display, useTimeFmt } from '@/components/ui';
@@ -11,17 +12,17 @@ import { AgendaItem, buildAgenda } from '@/lib/agenda';
 import { tapHaptic } from '@/lib/haptics';
 import { useTheme } from '@/theme/theme';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
-import { addDays, dateKey, daysBetween, keyToDate } from '@/lib/dates';
+import { addDays, dateKey, daysBetween, fmtDate, keyToDate } from '@/lib/dates';
+import { ChunkyButton } from '@/components/chunky';
 
-const HOUR_H = 64;                 // px per hour — calendar-standard density
-const PX_PER_MIN = HOUR_H / 60;
-const DAY_H = 24 * HOUR_H;         // one full day section
+const HOUR_LEVELS = [32, 48, 64, 96, 132]; // px-per-hour zoom stops (pinch snaps to nearest)
+const DEFAULT_HOUR_H = 64;                 // calendar-standard density
 const GUTTER = 50;                 // left hour-label column width
 const RAIL_X = GUTTER - 1;         // vertical rail x
 const BLOCK_PAD = 8;               // gap between rail and a block's left edge
 const RIGHT_PAD = 2;
 const COL_GAP = 4;                 // gap between side-by-side overlap columns
-const MIN_BLOCK_H = 40;            // smallest a routine block shrinks to
+const LINE_H = 24;                 // below this a routine collapses to a labelled rule
 const TASK_H = 24;                 // slim task marker height
 const SPAN = 14;                   // days loaded each side of today at start
 const CHUNK = 14;                  // days added per lazy extend
@@ -33,6 +34,8 @@ interface TimelineProps {
   todayK: string;
   doneMap: Record<string, boolean>;
   history: Record<string, string[]>;
+  viewKey?: string;
+  onViewKeyChange?: (key: string) => void;
   onRoutineLongPress?: (r: Routine) => void;
   style?: ViewStyle;
 }
@@ -42,6 +45,7 @@ interface Placed {
   start: number;
   top: number;
   height: number;
+  line: boolean;   // render as a labelled rule instead of a block (too short to read)
   col: number;
   cols: number;
 }
@@ -91,8 +95,7 @@ function packColumns(intervals: { start: number; end: number }[]): { col: number
   return out;
 }
 
-// Lay a day's timed items out as absolute-positioned blocks (overlap columns packed).
-function placeDay(timed: AgendaItem[]): Placed[] {
+function placeDay(timed: AgendaItem[], pxPerMin: number): Placed[] {
   const sorted = [...timed].sort((a, b) => toMins(a.time!) - toMins(b.time!));
   const intervals = sorted.map((it) => {
     const s = toMins(it.time!);
@@ -102,11 +105,14 @@ function placeDay(timed: AgendaItem[]): Placed[] {
   const packed = packColumns(intervals);
   return sorted.map((it, idx) => {
     const s = toMins(it.time!);
+    const naturalH = it.kind === 'routine' ? it.durationMin * pxPerMin : TASK_H;
+    const line = it.kind === 'routine' && naturalH < LINE_H;
     return {
       item: it,
       start: s,
-      top: s * PX_PER_MIN,
-      height: it.kind === 'routine' ? Math.max(it.durationMin * PX_PER_MIN, MIN_BLOCK_H) : TASK_H,
+      top: s * pxPerMin,
+      height: it.kind === 'routine' ? (line ? 0 : naturalH) : TASK_H,
+      line,
       col: packed[idx].col,
       cols: packed[idx].cols,
     };
@@ -119,6 +125,8 @@ export function Timeline({
   todayK,
   doneMap,
   history,
+  viewKey,
+  onViewKeyChange,
   onRoutineLongPress,
   style,
 }: TimelineProps) {
@@ -127,6 +135,30 @@ export function Timeline({
   const fmtT = useTimeFmt();
   const reducedMotion = useReducedMotion();
   const listRef = useRef<FlatList<string>>(null);
+
+  const dotScale = useSharedValue(1);
+  useEffect(() => {
+    if (reducedMotion) {
+      dotScale.value = 1;
+      return;
+    }
+    dotScale.value = 1;
+    dotScale.value = withRepeat(
+      withTiming(1.5, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, [reducedMotion]);
+
+  const dotAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: dotScale.value }],
+  }));
+
+  // ── zoom: px-per-hour, driven by pinch; snaps to HOUR_LEVELS ──
+  const [hourH, setHourH] = useState(DEFAULT_HOUR_H);
+  const hourHRef = useRef(DEFAULT_HOUR_H);
+  const pxPerMin = hourH / 60;
+  const dayH = 24 * hourH;
 
   // wall-clock minutes, refreshed every 30s
   const [nowMins, setNowMins] = useState(() => {
@@ -177,14 +209,17 @@ export function Timeline({
 
   // ── scroll bookkeeping: keep "now" pinned at a fixed screen anchor ──
   const [atNow, setAtNow] = useState(true);
+  const atNowRef = useRef(true);
+  const setAtNowBoth = useCallback((v: boolean) => { atNowRef.current = v; setAtNow(v); }, []);
   const didInit = useRef(false);
+  const scrollYRef = useRef(0);
 
   const offsetForNow = useCallback(() => {
     const idx = keys.indexOf(todayK);
     if (idx < 0) return 0;
     const anchorPx = viewH * ANCHOR;
-    return Math.max(0, idx * DAY_H + nowMins * PX_PER_MIN - anchorPx);
-  }, [keys, todayK, viewH, nowMins]);
+    return Math.max(0, idx * dayH + nowMins * pxPerMin - anchorPx);
+  }, [keys, todayK, viewH, nowMins, dayH, pxPerMin]);
 
   const scrollToNow = useCallback((animated: boolean) => {
     listRef.current?.scrollToOffset({ offset: offsetForNow(), animated });
@@ -198,10 +233,74 @@ export function Timeline({
     }
   }, [viewH, scrollToNow]);
 
-  // while pinned, re-anchor on each tick so the line stays put as the grid creeps
+  // while pinned, re-anchor on each 30s tick so the line stays put as the grid creeps
   useEffect(() => {
-    if (atNow && didInit.current && viewH > 0) scrollToNow(!reducedMotion);
-  }, [nowMins, atNow, viewH, reducedMotion, scrollToNow]);
+    if (atNowRef.current && didInit.current && viewH > 0) scrollToNow(!reducedMotion);
+  }, [nowMins, viewH, reducedMotion, scrollToNow]);
+
+  // Scroll to day when viewKey changes externally
+  useEffect(() => {
+    if (!didInit.current || viewH <= 0 || !viewKey) return;
+    const idx = keys.indexOf(viewKey);
+    if (idx >= 0) {
+      const targetOffset = idx * dayH + (viewKey === todayK ? nowMins * pxPerMin - viewH * ANCHOR : 0);
+      const diff = Math.abs(scrollYRef.current - targetOffset);
+      if (diff > 10) {
+        listRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
+      }
+    }
+  }, [viewKey, viewH, dayH, todayK, nowMins, pxPerMin, keys]);
+
+  const pendingZoom = useRef<{ di: number; mins: number } | null>(null);
+
+  const applyZoom = useCallback((nextH: number) => {
+    const oldH = hourHRef.current;
+    const oldDayH = 24 * oldH;
+    const oldPx = oldH / 60;
+    const absCenter = scrollYRef.current + viewH * ANCHOR;
+    const di = Math.floor(absCenter / oldDayH);
+    const mins = (absCenter - di * oldDayH) / oldPx;
+    hourHRef.current = nextH;
+    pendingZoom.current = { di, mins };
+    setHourH(nextH);
+  }, [viewH]);
+
+  const startHourH = useRef(DEFAULT_HOUR_H);
+
+  const onPinchStart = useCallback(() => {
+    startHourH.current = hourHRef.current;
+  }, []);
+
+  const onPinchChange = useCallback((scale: number) => {
+    let nextH = startHourH.current * scale;
+    nextH = Math.max(24, Math.min(180, nextH));
+    nextH = Math.round(nextH);
+    if (nextH !== hourHRef.current) {
+      applyZoom(nextH);
+    }
+  }, [applyZoom]);
+
+  const pinch = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onStart(() => {
+          runOnJS(onPinchStart)();
+        })
+        .onChange((e) => {
+          runOnJS(onPinchChange)(e.scale);
+        }),
+    [onPinchStart, onPinchChange]
+  );
+
+  // after a zoom re-render, restore the centred time (or re-pin to now)
+  useEffect(() => {
+    const p = pendingZoom.current;
+    if (!p || viewH <= 0) return;
+    pendingZoom.current = null;
+    if (atNowRef.current) { requestAnimationFrame(() => scrollToNow(false)); return; }
+    const offset = Math.max(0, p.di * dayH + p.mins * pxPerMin - viewH * ANCHOR);
+    requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset, animated: false }));
+  }, [hourH, viewH, dayH, pxPerMin, scrollToNow]);
 
   const extendFuture = useCallback(() => {
     setKeys((k) => {
@@ -223,16 +322,34 @@ export function Timeline({
     });
   }, []);
 
+  // ── pinned time cursor: a fixed-screen rule whose label tracks the scroll ──
+  const [scrubMin, setScrubMin] = useState(nowMins);
+  const scrubRef = useRef(nowMins);
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (e.nativeEvent.contentOffset.y < DAY_H && !prependingRef.current) {
+    const y = e.nativeEvent.contentOffset.y;
+    scrollYRef.current = y;
+    if (y < dayH && !prependingRef.current) {
       prependingRef.current = true;
       extendPast();
+    }
+    if (viewH > 0) {
+      const absCenter = y + viewH * ANCHOR;
+      const di = Math.floor(absCenter / dayH);
+      const mins = Math.max(0, Math.min(1439, Math.round((absCenter - di * dayH) / pxPerMin)));
+      if (mins !== scrubRef.current) { scrubRef.current = mins; setScrubMin(mins); }
+      if (di >= 0 && di < keys.length) {
+        const k = keys[di];
+        if (k && k !== viewKey && onViewKeyChange) {
+          onViewKeyChange(k);
+        }
+      }
     }
   };
 
   const getItemLayout = useCallback(
-    (_: ArrayLike<string> | null | undefined, i: number) => ({ length: DAY_H, offset: i * DAY_H, index: i }),
-    []
+    (_: ArrayLike<string> | null | undefined, i: number) => ({ length: dayH, offset: i * dayH, index: i }),
+    [dayH]
   );
 
   // geometry for a block given its overlap cluster
@@ -253,21 +370,21 @@ export function Timeline({
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Tomorrow';
     if (diff === -1) return 'Yesterday';
-    return keyToDate(key).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return fmtDate(keyToDate(key), { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const renderDay = useCallback(
     ({ item: key }: { item: string }) => {
       const { timed } = buildDay(key);
-      const blocks = placeDay(timed);
+      const blocks = placeDay(timed, pxPerMin);
       const isToday = key === todayK;
       const isPast = key < todayK;
 
       return (
-        <View style={{ height: DAY_H, position: 'relative' }}>
+        <View style={{ height: dayH, position: 'relative' }}>
           {/* hour gridlines + gutter labels (skip 0 — the date divider sits there) */}
           {Array.from({ length: 23 }, (_, idx) => idx + 1).map((h) => {
-            const y = h * 60 * PX_PER_MIN;
+            const y = h * 60 * pxPerMin;
             return (
               <View key={`h-${h}`} pointerEvents="none" style={{ position: 'absolute', top: y, left: 0, right: 0 }}>
                 <View style={{ position: 'absolute', left: GUTTER, right: 0, top: 0, height: 1, backgroundColor: t.lineSoft }} />
@@ -286,10 +403,18 @@ export function Timeline({
           {/* vertical rail */}
           <View pointerEvents="none" style={{ position: 'absolute', top: 0, bottom: 0, left: RAIL_X, width: 2, backgroundColor: t.lineSoft }} />
 
-          {/* midnight + date divider */}
+          {/* midnight divider — date label sits inline on the rule, 00 label in the gutter */}
           <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
             <View style={{ position: 'absolute', left: GUTTER, right: 0, top: 0, height: 2, backgroundColor: t.line }} />
-            <View style={{ position: 'absolute', top: 4, left: GUTTER + BLOCK_PAD, backgroundColor: t.bg, paddingRight: 8 }}>
+            <Text
+              style={{
+                position: 'absolute', left: 0, top: -7, width: GUTTER - 10, textAlign: 'right',
+                fontFamily: 'Nunito_800ExtraBold', fontSize: 11, color: t.faint,
+              }}
+            >
+              {hourLabel(0)}
+            </Text>
+            <View style={{ position: 'absolute', top: -8, left: GUTTER + 12, backgroundColor: t.bg, paddingHorizontal: 6 }}>
               <Display size={12} style={{ color: isToday ? t.text : t.muted }}>{dayLabel(key)}</Display>
             </View>
           </View>
@@ -305,34 +430,73 @@ export function Timeline({
               if (!r) return null;
               const done = b.item.done;
               const c = t.col(r.color);
+
+              if (b.line) {
+                return (
+                  <Pressable
+                    key={b.item.id}
+                    onPress={() => router.push(`/routine/${r.id}`)}
+                    onLongPress={() => onRoutineLongPress?.(r)}
+                    style={{ position: 'absolute', top: b.top - 9, left: GUTTER, right: 0, height: 18, opacity: isDrift ? 0.4 : 1 }}
+                  >
+                    <View style={{ position: 'absolute', left: 0, right: 0, top: 8, height: 2, borderRadius: 1, backgroundColor: done ? t.lineSoft : c.main, opacity: done ? 1 : 0.55 }} />
+                    <View style={{ position: 'absolute', left: BLOCK_PAD, top: 0, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: t.bg, paddingRight: 8 }}>
+                      <Text style={{ fontSize: 13 }}>{r.emoji}</Text>
+                      <Display size={12} numberOfLines={1} style={{ color: done ? t.faint : c.main }}>{r.name}</Display>
+                      {done && (
+                        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: t.green.main, alignItems: 'center', justifyContent: 'center' }}>
+                          <IconCheck size={8} color={t.green.ink} />
+                        </View>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              }
+
+              const startTime = b.item.time || r.reminder || "00:00";
+              const duration = routineMin(r);
+              const startMins = toMins(startTime);
+              const endMins = startMins + duration;
+              const endTime = minsToHHMM(endMins);
+              const timeStr = `${fmtT(startTime)} - ${fmtT(endTime)}`;
+
               const isSmall = b.height < 52;
+              const showIcons = b.height >= 32;
               return (
                 <Pressable
                   key={b.item.id}
                   onPress={() => router.push(`/routine/${r.id}`)}
                   onLongPress={() => onRoutineLongPress?.(r)}
-                  style={{ position: 'absolute', top: b.top, left: g.left, width: g.width, right: g.right, height: b.height, opacity: isDrift ? 0.4 : 1 }}
+                  style={{
+                    position: 'absolute', top: b.top, left: g.left, width: g.width, right: g.right, height: b.height,
+                    opacity: isDrift ? 0.4 : 1, overflow: 'visible',
+                  }}
                 >
                   <View
                     style={{
-                      flex: 1, flexDirection: 'row', borderRadius: 14,
+                      flex: 1, flexDirection: 'row', borderRadius: Math.min(14, Math.max(4, b.height / 2)),
                       backgroundColor: done ? t.raised : t.surface,
                       borderWidth: 2, borderColor: done ? t.lineSoft : c.main,
+                      overflow: 'visible',
                     }}
                   >
-                    <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: isSmall ? 2 : 6 }}>
-                      <Text style={{ fontSize: isSmall ? 15 : 20 }}>{r.emoji}</Text>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Display size={isSmall ? 13 : 15} numberOfLines={1} style={{ color: done ? t.faint : t.text }}>
+                    <View
+                      style={{
+                        flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8,
+                        paddingHorizontal: 12, paddingVertical: b.height < 32 ? 0 : (isSmall ? 2 : 6),
+                        overflow: 'visible',
+                      }}
+                    >
+                      <Text style={{ fontSize: isSmall ? 13 : 20 }}>{r.emoji}</Text>
+                      <View style={{ flex: 1, minWidth: 0, overflow: 'visible' }}>
+                        <Display size={isSmall ? 12 : 15} numberOfLines={1} style={{ color: done ? t.faint : t.text }}>
                           {r.name}
                         </Display>
-                        {!isSmall && (
-                          <Body size={11} color={t.faint} numberOfLines={1}>
-                            {r.steps.length} steps · {routineMin(r)}m
-                          </Body>
-                        )}
+                        <Body size={isSmall ? 9 : 11} color={t.faint} numberOfLines={1}>
+                          {isSmall ? `${timeStr} · ${duration}m` : `${r.steps.length} steps · ${duration}m (${timeStr})`}
+                        </Body>
                       </View>
-                      {done ? (
+                      {showIcons && (done ? (
                         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: t.green.main, alignItems: 'center', justifyContent: 'center' }}>
                           <IconCheck size={11} color={t.green.ink} />
                         </View>
@@ -340,7 +504,7 @@ export function Timeline({
                         <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: c.main, alignItems: 'center', justifyContent: 'center' }}>
                           <IconPlay size={9} color={c.main} />
                         </View>
-                      ) : null}
+                      ) : null)}
                     </View>
                   </View>
                 </Pressable>
@@ -373,50 +537,63 @@ export function Timeline({
               </Pressable>
             );
           })}
-
-          {/* NOW indicator — only on today's section */}
-          {isToday && <NowLine top={nowMins * PX_PER_MIN} label={fmtT(minsToHHMM(nowMins))} />}
         </View>
       );
     },
-    [buildDay, todayK, t, geom, hourLabel, nowMins, routines, todos, onRoutineLongPress, router, fmtT]
+    [buildDay, todayK, t, geom, hourLabel, dayLabel, nowMins, pxPerMin, dayH, routines, todos, onRoutineLongPress, router, fmtT]
   );
 
   return (
     <View style={[{ flex: 1, position: 'relative' }, style]} onLayout={onLayout}>
-      <FlatList
-        ref={listRef}
-        data={keys}
-        keyExtractor={(k) => k}
-        renderItem={renderDay}
-        getItemLayout={getItemLayout}
-        initialScrollIndex={SPAN}
-        showsVerticalScrollIndicator={false}
-        extraData={`${nowMins}|${trackW}|${atNow}`}
-        initialNumToRender={3}
-        windowSize={9}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        onScrollBeginDrag={() => setAtNow(false)}
-        onEndReached={extendFuture}
-        onEndReachedThreshold={1.5}
-      />
+      <GestureDetector gesture={pinch}>
+        <FlatList
+          ref={listRef}
+          data={keys}
+          keyExtractor={(k) => k}
+          renderItem={renderDay}
+          getItemLayout={getItemLayout}
+          initialScrollIndex={SPAN}
+          showsVerticalScrollIndicator={false}
+          extraData={`${nowMins}|${trackW}|${hourH}`}
+          initialNumToRender={3}
+          windowSize={9}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onScrollBeginDrag={() => setAtNowBoth(false)}
+          onEndReached={extendFuture}
+          onEndReachedThreshold={1.5}
+        />
+      </GestureDetector>
+
+      {/* Pinned bright now-line / time cursor */}
+      {viewH > 0 && (
+        <NowLine
+          top={viewH * ANCHOR}
+          label={fmtT(minsToHHMM(scrubMin))}
+        />
+      )}
 
       {!atNow && (
         <Pressable
           onPressIn={() => tapHaptic()}
-          onPress={() => { setAtNow(true); scrollToNow(!reducedMotion); }}
+          onPress={() => { setAtNowBoth(true); scrollToNow(!reducedMotion); }}
           accessibilityLabel="Jump to now"
           style={{
             position: 'absolute', right: 16, bottom: 20,
             flexDirection: 'row', alignItems: 'center', gap: 6,
             backgroundColor: t.accent.main, borderRadius: 99,
-            paddingVertical: 9, paddingHorizontal: 16,
-            shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+            paddingVertical: 10, paddingHorizontal: 16,
+            borderWidth: 2, borderColor: t.accent.deep,
+            zIndex: 60,
           }}
         >
-          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.accent.ink }} />
+          <Animated.View
+            style={[
+              { width: 7, height: 7, borderRadius: 4, backgroundColor: t.accent.ink },
+              dotAnimatedStyle,
+            ]}
+          />
           <Text style={{ fontFamily: 'Nunito_800ExtraBold', fontSize: 13, color: t.accent.ink, textTransform: 'uppercase', letterSpacing: 0.5 }}>Now</Text>
         </Pressable>
       )}

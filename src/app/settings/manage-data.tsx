@@ -1,8 +1,9 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import { File, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconChevL, IconRestart, IconShare } from '@/components/icons';
@@ -45,18 +46,35 @@ export default function ManageDataScreen() {
     try {
       tapHaptic();
       const json = serializeBackup();
-      const file = new File(Paths.cache, backupFilename());
-      if (file.exists) file.delete();
-      file.create();
-      file.write(json);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export Flint data',
-          UTI: 'public.json',
-        });
+      const filename = backupFilename();
+      if (Platform.OS === 'android') {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (permissions.granted) {
+          const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            filename,
+            'application/json'
+          );
+          await FileSystem.writeAsStringAsync(fileUri, json, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          finishHaptic();
+          toast('Saved to device');
+        }
       } else {
-        toast('Sharing unavailable');
+        const file = new File(Paths.cache, filename);
+        if (file.exists) file.delete();
+        file.create();
+        file.write(json);
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(file.uri, {
+            mimeType: 'application/json',
+            dialogTitle: 'Export Flint data',
+            UTI: 'public.json',
+          });
+        } else {
+          toast('Sharing unavailable');
+        }
       }
     } catch (e) {
       console.error('[Export]', e);

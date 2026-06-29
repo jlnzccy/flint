@@ -17,7 +17,7 @@ import { useToast } from '@/components/toast';
 import { Body, Chip, Display, Label, useTimeFmt } from '@/components/ui';
 import { Routine, routineOnDay } from '@/data/defaults';
 import { confirmDestructive } from '@/lib/confirm';
-import { addDays, dateKey, greetingNow, keyToDate, minsUntil, todayKey } from '@/lib/dates';
+import { addDays, dateKey, fmtDate, greetingNow, keyToDate, minsUntil, todayKey } from '@/lib/dates';
 import { finishHaptic, tapHaptic } from '@/lib/haptics';
 import { buildAgenda, AgendaItem } from '@/lib/agenda';
 import { mergedHistory, resolveRoutines, streakOf, useStore, todoDoneOn, todoIsToday } from '@/state/store';
@@ -254,8 +254,8 @@ export default function TodayScreen() {
     </View>
   );
 
-  const dateLabel = viewDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const heroTitle = isToday ? greetingNow() : viewDate.toLocaleDateString('en-US', { weekday: 'long' });
+  const dateLabel = fmtDate(viewDate, { weekday: 'short', month: 'short', day: 'numeric' });
+  const heroTitle = isToday ? greetingNow() : fmtDate(viewDate, { weekday: 'long' });
   const routinesLabel = isToday
     ? `Routines${totalCount ? ` · ${doneCount}/${totalCount}` : ''}`
     : isPast
@@ -330,12 +330,16 @@ export default function TodayScreen() {
     </View>
   );
 
-  // sticky Anytime strip for timeline mode — today's flexible items, h-scroll on overflow
+  // Anytime strip for timeline mode — pinned at the bottom; active items lead, done sink to the end
+  const anytimeSorted = useMemo(
+    () => [...agenda.anytime].sort((a, b) => Number(a.done) - Number(b.done)),
+    [agenda.anytime]
+  );
   const anytimeStrip = agenda.anytime.length > 0 ? (
-    <View style={{ paddingLeft: 20, paddingBottom: 10 }}>
+    <View style={{ paddingLeft: 20, paddingTop: 10, paddingBottom: 6 + insets.bottom, borderTopWidth: 2, borderTopColor: t.lineSoft, backgroundColor: t.bg }}>
       <Label style={{ marginBottom: 8, fontSize: 11 }}>Anytime</Label>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 20 }}>
-        {agenda.anytime.map((item) => {
+        {anytimeSorted.map((item) => {
           const done = item.done;
           const due = item.due;
           const color = item.kind === 'routine' ? t.col(item.color) : { main: t.accent.main, soft: t.accent.soft };
@@ -412,18 +416,20 @@ export default function TodayScreen() {
         // timeline owns its own vertical scroll — no outer ScrollView, no horizontal day-swipe
         <View style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20 }}>{sharedBar}</View>
-          {anytimeStrip}
           <Timeline
             routines={routines}
             todos={todos}
             todayK={todayK}
             doneMap={doneMap}
             history={history}
+            viewKey={viewKey}
+            onViewKeyChange={setViewKey}
             onRoutineLongPress={(r) => {
               tapHaptic();
               setPreview(r);
             }}
           />
+          {anytimeStrip}
         </View>
       ) : (
         <GestureDetector gesture={swipe}>

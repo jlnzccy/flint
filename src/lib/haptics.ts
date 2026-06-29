@@ -19,7 +19,7 @@ const android = Platform.OS === 'android';
    the device haptic engine, which lands light, so it stays as-is. */
 export function tapHaptic() {
   if (!on()) return;
-  if (android) Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Clock_Tick).catch(() => {});
+  if (android) Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Segment_Frequent_Tick).catch(() => {});
   else Haptics.selectionAsync().catch(() => {});
 }
 

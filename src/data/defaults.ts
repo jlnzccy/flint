@@ -31,6 +31,7 @@ export interface Routine {
   alarmRingtoneUri?: string | null; // per-routine alarm sound; null/absent = bundled marimba
   pomodoro?: RoutinePomodoro; // present = a Pomodoro routine; steps are generated from this (W)
   builtin?: boolean;
+  createdAt?: string; // dateKey when this routine was created
 }
 
 export const DEFAULT_POMODORO_CFG: RoutinePomodoro = { focusMin: 25, breakMin: 5, longBreakMin: 15, sessions: 4, longEvery: 4 };

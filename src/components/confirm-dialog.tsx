@@ -66,7 +66,7 @@ export function ConfirmHost() {
             <Body size={14.5} color={t.muted} style={{ marginBottom: 20, lineHeight: 21 }}>{active.message}</Body>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <ChunkyButton ghost fontSize={15} pad={[13, 18]} style={{ flex: 1 }} onPress={close}>
+            <ChunkyButton ghost fontSize={15} pad={[11, 16]} style={{ flex: 1 }} onPress={close}>
               {active.cancelLabel ?? 'Cancel'}
             </ChunkyButton>
             <ChunkyButton
@@ -74,7 +74,7 @@ export function ConfirmHost() {
               deep={cc.deep}
               ink={cc.ink}
               fontSize={15}
-              pad={[13, 18]}
+              pad={[11, 16]}
               style={{ flex: 1 }}
               onPress={() => {
                 const fn = active.onConfirm;

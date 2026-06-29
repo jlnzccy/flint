@@ -19,6 +19,7 @@ import { Body, Chip, Display, FlintInput, Label, Segmented, Toggle, useTimeFmt }
 import { buildPomodoroSteps, COLOR_CHOICES, DEFAULT_POMODORO_CFG, EMOJI_CHOICES, getTemplate, routineMin, Routine, RoutinePomodoro } from '@/data/defaults';
 import { confirmDestructive } from '@/lib/confirm';
 import { tapHaptic } from '@/lib/haptics';
+import { todayKey } from '@/lib/dates';
 import { resolveRoutines, useStore } from '@/state/store';
 import { useTheme } from '@/theme/theme';
 import { hexDarken } from '@/theme/colors';
@@ -218,6 +219,7 @@ export default function Editor() {
   const save = () => {
     const r: Routine = {
       id: routine ? routine.id : 'c' + Date.now(),
+      createdAt: routine ? routine.createdAt : todayKey(),
       name: name.trim(),
       emoji,
       color,

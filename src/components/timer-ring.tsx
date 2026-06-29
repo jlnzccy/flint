@@ -1,12 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedProps,
-  useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
@@ -29,31 +26,27 @@ export function TimerRing({ progress, color, size = 250, pulsing, children }: Ti
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const p = useSharedValue(Math.max(0, Math.min(1, progress)));
-  const scale = useSharedValue(1);
+
+  const prevProgress = useRef(progress);
 
   useEffect(() => {
-    p.value = withTiming(Math.max(0, Math.min(1, progress)), { duration: 500, easing: Easing.linear });
-  }, [progress, p]);
+    const diff = Math.abs(progress - prevProgress.current);
+    prevProgress.current = progress;
 
-  useEffect(() => {
-    if (pulsing) {
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1.035, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1
-      );
-    } else {
-      scale.value = withTiming(1, { duration: 200 });
-    }
-  }, [pulsing, scale]);
+    const isJump = diff > 0.15;
+    const isPaused = !pulsing;
+    const duration = (isJump || isPaused) ? 250 : 1000;
+
+    p.value = withTiming(Math.max(0, Math.min(1, progress)), {
+      duration,
+      easing: isJump ? Easing.out(Easing.ease) : Easing.linear,
+    });
+  }, [progress, pulsing, p]);
 
   const ringProps = useAnimatedProps(() => ({ strokeDashoffset: c * (1 - p.value) }));
-  const pulse = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <Animated.View style={[{ width: size, height: size }, pulse]}>
+    <View style={{ width: size, height: size }}>
       <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
         <Circle cx={size / 2} cy={size / 2} r={r} fill={t.surface} stroke={t.lineSoft} strokeWidth={stroke} />
         <AnimatedCircle
@@ -71,6 +64,6 @@ export function TimerRing({ progress, color, size = 250, pulsing, children }: Ti
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
         {children}
       </View>
-    </Animated.View>
+    </View>
   );
 }

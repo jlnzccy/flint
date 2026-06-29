@@ -28,6 +28,7 @@ export function buildAgenda(
 
   // 1. Process Routines
   for (const r of routines) {
+    if (r.createdAt && day < r.createdAt) continue;
     const days = r.days;
     const activeOnDay = !days || days.length === 0 || days.includes(dow);
     if (!activeOnDay) continue;

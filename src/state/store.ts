@@ -244,7 +244,7 @@ export const useStore = create<FlintState>()(
           const src = resolveRoutines({ custom: s.custom, overrides: s.overrides, order: s.order, archived: [], deleted: s.deleted }).find((r) => r.id === id);
           if (!src) return {};
           const { builtin: _b, ...rest } = src;
-          const copy: Routine = { ...rest, id: 'c' + Date.now(), name: `${src.name} copy` };
+          const copy: Routine = { ...rest, id: 'c' + Date.now(), name: `${src.name} copy`, createdAt: todayKey() };
           const order = s.order.length === 0 ? s.order : [...s.order, copy.id];
           return { custom: [...s.custom, copy], order };
         }),

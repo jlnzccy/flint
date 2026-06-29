@@ -53,7 +53,7 @@ function HoldDelete() {
       // now-empty screen). Fresh data = onboarding runs again.
       useStore.getState().resetAll();
       toast('Erased');
-      if (router.canDismiss()) router.dismissAll();
+      router.replace('/onboarding');
     }, HOLD_MS);
   };
 
